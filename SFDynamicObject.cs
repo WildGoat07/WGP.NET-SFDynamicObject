@@ -584,7 +584,6 @@ namespace WGP.SFDynamicObject
                         rect.Top = BitConverter.ToInt32(t, 0);
                         rect.Width = BitConverter.ToInt32(w, 0);
                         rect.Height = BitConverter.ToInt32(h, 0);
-                        Console.WriteLine(Newtonsoft.Json.JsonConvert.SerializeObject(rect));
                         shape.TextureRect = rect;
                     }
                     {
