@@ -72,6 +72,41 @@ namespace WGP.SFDynamicObject
             ResetAnimation();
         }
         /// <summary>
+        /// Returns the local bounding box.
+        /// </summary>
+        /// <returns></returns>
+        public FloatRect GetLocalBounds()
+        {
+            FloatRect result = new FloatRect();
+            foreach (var bone in BonesHierarchy)
+            {
+                var tr = bone.ComputedTransform;
+                if (bone.AttachedSprites != null)
+                {
+                    foreach (var sprite in bone.AttachedSprites)
+                    {
+                        var rect = tr.TransformRect(sprite.Value.GetGlobalBounds());
+                        rect.Width += rect.Left;
+                        rect.Height += rect.Top;
+
+                        result.Left = Utilities.Min(result.Left, rect.Left);
+                        result.Top = Utilities.Min(result.Top, rect.Top);
+                        result.Width = Utilities.Max(result.Width, rect.Width);
+                        result.Height = Utilities.Max(result.Height, rect.Height);
+
+                    }
+                }
+            }
+            result.Width -= result.Left;
+            result.Height -= result.Top;
+            return result;
+        }
+        /// <summary>
+        /// Returns the global bounding box.
+        /// </summary>
+        /// <returns></returns>
+        public FloatRect GetGlobalBounds() => Transform.TransformRect(GetLocalBounds());
+        /// <summary>
         /// Loads an animation. If a chronometer is set, it will reset.
         /// </summary>
         /// <param name="animName">Name of the animation to load.</param>
