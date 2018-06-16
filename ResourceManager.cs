@@ -8,11 +8,20 @@ using SFML;
 
 namespace WGP.SFDynamicObject
 {
+    /// <summary>
+    /// Manager that holds SFML resources.
+    /// </summary>
     public class ResourceManager : Dictionary<string, ResourceManager.Resource>
     {
         public struct Resource
         {
+            /// <summary>
+            /// The resource.
+            /// </summary>
             public ObjectBase Data { get; set; }
+            /// <summary>
+            /// The path to the file of the resource.
+            /// </summary>
             public string Path { get; set; }
         }
         public ResourceManager() : base() { }
@@ -28,7 +37,10 @@ namespace WGP.SFDynamicObject
             public string Path { get; set; }
             public string Type { get; set; }
         }
-
+        /// <summary>
+        /// Saves the manager to a file.
+        /// </summary>
+        /// <param name="path">filepath</param>
         public void SaveToFile(string path)
         {
             var resourceList = new List<Duo>();
@@ -67,7 +79,10 @@ namespace WGP.SFDynamicObject
                 throw new Exception("Unable to save the ResourceManager to the file \"" + path + "\"", e);
             }
         }
-
+        /// <summary>
+        /// Loads a manager from a file.
+        /// </summary>
+        /// <param name="path">filepath</param>
         public void LoadFromFile(string path)
         {
             var reader = new System.IO.StreamReader(path);
