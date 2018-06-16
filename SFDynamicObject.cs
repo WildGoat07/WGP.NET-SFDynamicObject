@@ -39,11 +39,14 @@ namespace WGP.SFDynamicObject
             states.Transform *= Transform;
             foreach (var bone in BonesHierarchy)
             {
-                foreach(var sprite in bone.AttachedSprites)
+                if (bone.AttachedSprites != null)
                 {
-                    RenderStates st = new RenderStates(states);
-                    st.Transform *= bone.ComputedTransform;
-                    target.Draw(sprite.Value, st);
+                    foreach (var sprite in bone.AttachedSprites)
+                    {
+                        RenderStates st = new RenderStates(states);
+                        st.Transform *= bone.ComputedTransform;
+                        target.Draw(sprite.Value, st);
+                    }
                 }
             }
         }
