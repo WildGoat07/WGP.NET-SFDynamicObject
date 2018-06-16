@@ -782,7 +782,8 @@ namespace WGP.SFDynamicObject
                 int numSprite = 0;
                 foreach (var bone in BonesHierarchy)
                 {
-                    numSprite += bone.AttachedSprites.Count;
+                    if (bone.AttachedSprites != null)
+                        numSprite += bone.AttachedSprites.Count;
                 }
                 {
                     var bytes = BitConverter.GetBytes((int)numSprite);
@@ -790,75 +791,78 @@ namespace WGP.SFDynamicObject
                 }
                 foreach (var bone in BonesHierarchy)
                 {
-                    foreach (var sprite in bone.AttachedSprites)
+                    if (bone.AttachedSprites != null)
                     {
+                        foreach (var sprite in bone.AttachedSprites)
                         {
-                            var nameB = StringToByte(bone.Name);
-                            var sizeB = BitConverter.GetBytes((int)nameB.Length);
-                            stream.Write(sizeB, 0, sizeB.Length);
-                            stream.Write(nameB, 0, nameB.Length);
-                        }
-                        if (sprite.Key != null && sprite.Key != "")
-                        {
-                            var nameB = StringToByte(sprite.Key);
-                            var sizeB = BitConverter.GetBytes((int)nameB.Length);
-                            stream.Write(sizeB, 0, sizeB.Length);
-                            stream.Write(nameB, 0, nameB.Length);
-                        }
-                        else
-                        {
-                            var bytes = BitConverter.GetBytes((int)0);
-                            stream.Write(bytes, 0, bytes.Length);
-                        }
-                        {
-                            var vecX = BitConverter.GetBytes((float)sprite.Value.Position.X);
-                            var vecY = BitConverter.GetBytes((float)sprite.Value.Position.Y);
-                            stream.Write(vecX, 0, vecX.Length);
-                            stream.Write(vecY, 0, vecY.Length);
-                        }
-                        {
-                            var vecX = BitConverter.GetBytes((float)sprite.Value.Origin.X);
-                            var vecY = BitConverter.GetBytes((float)sprite.Value.Origin.Y);
-                            stream.Write(vecX, 0, vecX.Length);
-                            stream.Write(vecY, 0, vecY.Length);
-                        }
-                        {
-                            var vecX = BitConverter.GetBytes((float)sprite.Value.Scale.X);
-                            var vecY = BitConverter.GetBytes((float)sprite.Value.Scale.Y);
-                            stream.Write(vecX, 0, vecX.Length);
-                            stream.Write(vecY, 0, vecY.Length);
-                        }
-                        {
-                            var rot = BitConverter.GetBytes((float)sprite.Value.Rotation);
-                            stream.Write(rot, 0, rot.Length);
-                        }
-                        {
-                            var vecX = BitConverter.GetBytes((float)sprite.Value.Size.X);
-                            var vecY = BitConverter.GetBytes((float)sprite.Value.Size.Y);
-                            stream.Write(vecX, 0, vecX.Length);
-                            stream.Write(vecY, 0, vecY.Length);
-                        }
-                        {
-                            var vecL = BitConverter.GetBytes((int)sprite.Value.TextureRect.Left);
-                            var vecT = BitConverter.GetBytes((int)sprite.Value.TextureRect.Top);
-                            var vecW = BitConverter.GetBytes((int)sprite.Value.TextureRect.Width);
-                            var vecH = BitConverter.GetBytes((int)sprite.Value.TextureRect.Height);
-                            stream.Write(vecL, 0, vecL.Length);
-                            stream.Write(vecT, 0, vecT.Length);
-                            stream.Write(vecW, 0, vecW.Length);
-                            stream.Write(vecH, 0, vecH.Length);
-                        }
-                        {
-                            var color = new byte[] { sprite.Value.FillColor.R, sprite.Value.FillColor.G, sprite.Value.FillColor.B, sprite.Value.FillColor.A };
-                            stream.Write(color, 0, color.Length);
-                        }
-                        {
-                            var color = new byte[] { sprite.Value.OutlineColor.R, sprite.Value.OutlineColor.G, sprite.Value.OutlineColor.B, sprite.Value.OutlineColor.A };
-                            stream.Write(color, 0, color.Length);
-                        }
-                        {
-                            var bytes = BitConverter.GetBytes((float)sprite.Value.OutlineThickness);
-                            stream.Write(bytes, 0, bytes.Length);
+                            {
+                                var nameB = StringToByte(bone.Name);
+                                var sizeB = BitConverter.GetBytes((int)nameB.Length);
+                                stream.Write(sizeB, 0, sizeB.Length);
+                                stream.Write(nameB, 0, nameB.Length);
+                            }
+                            if (sprite.Key != null && sprite.Key != "")
+                            {
+                                var nameB = StringToByte(sprite.Key);
+                                var sizeB = BitConverter.GetBytes((int)nameB.Length);
+                                stream.Write(sizeB, 0, sizeB.Length);
+                                stream.Write(nameB, 0, nameB.Length);
+                            }
+                            else
+                            {
+                                var bytes = BitConverter.GetBytes((int)0);
+                                stream.Write(bytes, 0, bytes.Length);
+                            }
+                            {
+                                var vecX = BitConverter.GetBytes((float)sprite.Value.Position.X);
+                                var vecY = BitConverter.GetBytes((float)sprite.Value.Position.Y);
+                                stream.Write(vecX, 0, vecX.Length);
+                                stream.Write(vecY, 0, vecY.Length);
+                            }
+                            {
+                                var vecX = BitConverter.GetBytes((float)sprite.Value.Origin.X);
+                                var vecY = BitConverter.GetBytes((float)sprite.Value.Origin.Y);
+                                stream.Write(vecX, 0, vecX.Length);
+                                stream.Write(vecY, 0, vecY.Length);
+                            }
+                            {
+                                var vecX = BitConverter.GetBytes((float)sprite.Value.Scale.X);
+                                var vecY = BitConverter.GetBytes((float)sprite.Value.Scale.Y);
+                                stream.Write(vecX, 0, vecX.Length);
+                                stream.Write(vecY, 0, vecY.Length);
+                            }
+                            {
+                                var rot = BitConverter.GetBytes((float)sprite.Value.Rotation);
+                                stream.Write(rot, 0, rot.Length);
+                            }
+                            {
+                                var vecX = BitConverter.GetBytes((float)sprite.Value.Size.X);
+                                var vecY = BitConverter.GetBytes((float)sprite.Value.Size.Y);
+                                stream.Write(vecX, 0, vecX.Length);
+                                stream.Write(vecY, 0, vecY.Length);
+                            }
+                            {
+                                var vecL = BitConverter.GetBytes((int)sprite.Value.TextureRect.Left);
+                                var vecT = BitConverter.GetBytes((int)sprite.Value.TextureRect.Top);
+                                var vecW = BitConverter.GetBytes((int)sprite.Value.TextureRect.Width);
+                                var vecH = BitConverter.GetBytes((int)sprite.Value.TextureRect.Height);
+                                stream.Write(vecL, 0, vecL.Length);
+                                stream.Write(vecT, 0, vecT.Length);
+                                stream.Write(vecW, 0, vecW.Length);
+                                stream.Write(vecH, 0, vecH.Length);
+                            }
+                            {
+                                var color = new byte[] { sprite.Value.FillColor.R, sprite.Value.FillColor.G, sprite.Value.FillColor.B, sprite.Value.FillColor.A };
+                                stream.Write(color, 0, color.Length);
+                            }
+                            {
+                                var color = new byte[] { sprite.Value.OutlineColor.R, sprite.Value.OutlineColor.G, sprite.Value.OutlineColor.B, sprite.Value.OutlineColor.A };
+                                stream.Write(color, 0, color.Length);
+                            }
+                            {
+                                var bytes = BitConverter.GetBytes((float)sprite.Value.OutlineThickness);
+                                stream.Write(bytes, 0, bytes.Length);
+                            }
                         }
                     }
                 }
