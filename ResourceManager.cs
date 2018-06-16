@@ -36,7 +36,9 @@ namespace WGP.SFDynamicObject
             {
                 var duo = new Duo();
                 duo.ID = resource.Key;
-                duo.Path = resource.Value.Path;
+                var resFile = new Uri(System.IO.Path.GetFullPath(resource.Value.Path));
+                var refFile = new Uri(System.IO.Path.GetFullPath(path));
+                duo.Path = refFile.MakeRelativeUri(resFile).OriginalString;
                 if (resource.Value.Data is SFML.Graphics.Texture)
                 {
                     duo.Type = "Texture";
