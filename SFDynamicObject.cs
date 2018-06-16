@@ -66,11 +66,10 @@ namespace WGP.SFDynamicObject
         /// </summary>
         public SFDynamicObject()
         {
-            transforms = null;
             BonesHierarchy = null;
             MasterBones = null;
             Animations = null;
-            currentAnim = null;
+            ResetAnimation();
         }
         /// <summary>
         /// Loads an animation. If a chronometer is set, it will reset.
@@ -97,6 +96,14 @@ namespace WGP.SFDynamicObject
                 }
             }
             throw new Exception("No animation named \"" + animName + "\"");
+        }
+        /// <summary>
+        /// Resets the positon of the object, making it in the default position
+        /// </summary>
+        public void ResetAnimation()
+        {
+            transforms = new Dictionary<Bone, Transformable>();
+            currentAnim = null;
         }
         /// <summary>
         /// Updates the display of the object by adjusting the bones to match the animations. Won't have any effect if there are no chronometer set or no animation loaded.
@@ -146,6 +153,18 @@ namespace WGP.SFDynamicObject
                     }
                     else
                         transforms[bone] = new Transformable();
+                }
+                foreach (var bone in MasterBones)
+                {
+                    ComputeBone(bone, null);
+                }
+            }
+            else
+            {
+                foreach (var bone in BonesHierarchy)
+                {
+                    transforms[bone] = new Transformable();
+                    continue;
                 }
                 foreach (var bone in MasterBones)
                 {
