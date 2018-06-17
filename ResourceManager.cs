@@ -31,6 +31,11 @@ namespace WGP.SFDynamicObject
         public ResourceManager(int capacity, IEqualityComparer<string> comparer) : base(capacity, comparer) { }
         public ResourceManager(IDictionary<string, Resource> dictionary, IEqualityComparer<string> comparer) : base(dictionary, comparer) { }
 
+        /// <summary>
+        /// The filepath to the resource manager.
+        /// </summary>
+        public string Path { get; private set; }
+
         internal struct Duo
         {
             public string ID { get; set; }
@@ -78,6 +83,7 @@ namespace WGP.SFDynamicObject
             {
                 throw new Exception("Unable to save the ResourceManager to the file \"" + path + "\"", e);
             }
+            Path = path;
         }
         /// <summary>
         /// Loads a manager from a file.
@@ -142,6 +148,7 @@ namespace WGP.SFDynamicObject
                     }
                 }
             }
+            Path = path;
         }
     }
 }
