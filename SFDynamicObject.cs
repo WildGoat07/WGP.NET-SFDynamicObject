@@ -1018,7 +1018,10 @@ namespace WGP.SFDynamicObject
         /// The childs of the bone. They will be relative to their parent.
         /// </summary>
         public ICollection<Bone> ChildBones { get; set; }
-        internal Transform ComputedTransform { get; set; }
+        /// <summary>
+        /// The absolute transforms of the bone. For internal uses only.
+        /// </summary>
+        public Transform ComputedTransform { get; internal set; }
         /// <summary>
         /// The list of sprites affected by the changes of the bone. Be careful of the order (the order of drawing). The string is the name of the texture in the texture manager.
         /// </summary>
