@@ -118,22 +118,31 @@ namespace WGP.SFDynamicObject
         {
             if (Animations == null)
                 throw new Exception("No animations provided");
-            foreach (var item in Animations)
+            if (animName == null)
+                currentAnim = null;
+            else
             {
-                if (item.Name == animName)
+                foreach (var item in Animations)
                 {
-                    currentAnim = item;
-                    transforms = new Dictionary<Bone, Transformable>();
-                    foreach (var statList in currentAnim.Bones)
-                        Array.Sort(statList.Value);
-                    foreach (var bone in BonesHierarchy)
-                        transforms.Add(bone, default);
-                    if (Chronometer != null && reset)
-                        Chronometer.Restart();
-                    return;
+                    if (item.Name == animName)
+                    {
+                        currentAnim = item;
+                        transforms = new Dictionary<Bone, Transformable>();
+                        foreach (var statList in currentAnim.Bones)
+                        {
+                            var tmp = statList.Value.ToArray();
+                            Array.Sort(tmp);
+                            statList.Value = new List<Animation.Key>(tmp);
+                        }
+                        foreach (var bone in BonesHierarchy)
+                            transforms.Add(bone, default);
+                        if (Chronometer != null && reset)
+                            Chronometer.Restart();
+                        return;
+                    }
                 }
+                throw new Exception("No animation named \"" + animName + "\"");
             }
-            throw new Exception("No animation named \"" + animName + "\"");
         }
         /// <summary>
         /// Resets the positon of the object, making it in the default position
@@ -156,38 +165,44 @@ namespace WGP.SFDynamicObject
 
                 foreach (var bone in BonesHierarchy)
                 {
-                    if (currentAnim.Bones.ContainsKey(bone.Name))
+                    if (currentAnim.Bones != null && currentAnim.Bones.Contains(new Animation.Couple<string, List<Animation.Key>>() { Key = bone.Name }))
                     {
-                        if (currentAnim.Bones[bone.Name].Count() == 0)
+                        if (currentAnim.Bones.First((b) => b.Key == bone.Name).Value != null && currentAnim.Bones.First((b) => b.Key == bone.Name).Value.Count() == 0)
                         {
                             transforms[bone] = new Transformable();
                             continue;
                         }
-                        ICollection<Animation.Key> states;
+                        List<Animation.Key> states;
                         try
                         {
-                            states = currentAnim.Bones[bone.Name];
+                            var tmp = currentAnim.Bones.First((b) => b.Key == bone.Name);
+                            if (tmp == null)
+                                throw new KeyNotFoundException();
+                            states = tmp.Value;
                         }
                         catch (KeyNotFoundException e)
                         {
                             throw new Exception("No bone named \"" + bone.Name + "\" in  the animation \"" + currentAnim.Name + "\"");
                         }
-                        Animation.Key first = states.First();
-                        Animation.Key second = states.Last();
-                        foreach (var state in states)
+                        if (states != null)
                         {
-                            if (first.Position < state.Position && state.Position < currentTime)
-                                first = state;
-                            if (second.Position > state.Position && state.Position > currentTime)
-                                second = state;
+                            Animation.Key first = states.First();
+                            Animation.Key second = states.Last();
+                            foreach (var state in states)
+                            {
+                                if (first.Position < state.Position && state.Position < currentTime)
+                                    first = state;
+                                if (second.Position > state.Position && state.Position > currentTime)
+                                    second = state;
+                            }
+                            Transformable tr = new Transformable();
+                            float perc = Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds());
+                            tr.Position = Utilities.Interpolation(perc, first.Transform.Position, second.Transform.Position);
+                            tr.Scale = Utilities.Interpolation(perc, first.Transform.Scale, second.Transform.Scale);
+                            tr.Rotation = Utilities.Interpolation(perc, first.Transform.Rotation, second.Transform.Rotation);
+                            tr.Origin = Utilities.Interpolation(perc, first.Transform.Origin, second.Transform.Origin);
+                            transforms[bone] = tr;
                         }
-                        Transformable tr = new Transformable();
-                        float perc = Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds());
-                        tr.Position = Utilities.Interpolation(perc, first.Transform.Position, second.Transform.Position);
-                        tr.Scale = Utilities.Interpolation(perc, first.Transform.Scale, second.Transform.Scale);
-                        tr.Rotation = Utilities.Interpolation(perc, first.Transform.Rotation, second.Transform.Rotation);
-                        tr.Origin = Utilities.Interpolation(perc, first.Transform.Origin, second.Transform.Origin);
-                        transforms[bone] = tr;
                     }
                     else
                         transforms[bone] = new Transformable();
@@ -427,7 +442,7 @@ namespace WGP.SFDynamicObject
                             throw new Exception(WrongFile);
                         numBone = BitConverter.ToInt32(bytes, 0);
                         if (numBone > 0)
-                            tmp.Bones = new Dictionary<string, Animation.Key[]>();
+                            tmp.Bones = new List<Animation.Couple<string, List<Animation.Key>>>();
                         for (int j = 0;j<numBone;j++)
                         {
                             string boneName;
@@ -506,7 +521,7 @@ namespace WGP.SFDynamicObject
                                 }
                                 keys.Add(tmpKey);
                             }
-                            tmp.Bones.Add(boneName, keys.ToArray());
+                            tmp.Bones.Add(new Animation.Couple<string, List<Animation.Key>>() { Key = boneName, Value = keys });
                         }
                     }
                     Animations.Add(tmp);
@@ -796,7 +811,7 @@ namespace WGP.SFDynamicObject
                                 stream.Write(nameB, 0, nameB.Length);
                             }
                             {
-                                var bytes = BitConverter.GetBytes((int)boneKeys.Value.Length);
+                                var bytes = BitConverter.GetBytes((int)boneKeys.Value.Count);
                                 stream.Write(bytes, 0, bytes.Length);
                             }
                             foreach (var key in boneKeys.Value)
@@ -988,10 +1003,20 @@ namespace WGP.SFDynamicObject
                 throw new InvalidOperationException("Invalid type :" + obj.GetType());
             }
         }
+        public class Couple<T, U>: IEquatable<Couple<T, U>> where T : IEquatable<T>
+        {
+            public T Key { get; set; }
+            public U Value { get; set; }
+
+            public bool Equals(Couple<T, U> other)
+            {
+                return Key.Equals(other.Key);
+            }
+        }
         /// <summary>
         /// A double array of all the keys of the animation, sorted by bones.
         /// </summary>
-        public IDictionary<string, Key[]> Bones { get; set; }
+        public List<Couple<string, List<Key>>> Bones { get; set; }
         /// <summary>
         /// The name of the animation. Needed when loading an animation.
         /// </summary>
