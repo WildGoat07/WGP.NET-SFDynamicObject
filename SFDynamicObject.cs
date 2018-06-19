@@ -128,11 +128,14 @@ namespace WGP.SFDynamicObject
                     {
                         currentAnim = item;
                         transforms = new Dictionary<Bone, Transformable>();
-                        foreach (var statList in currentAnim.Bones)
+                        if (currentAnim.Bones != null)
                         {
-                            var tmp = statList.Value.ToArray();
-                            Array.Sort(tmp);
-                            statList.Value = new List<Animation.Key>(tmp);
+                            foreach (var statList in currentAnim.Bones)
+                            {
+                                var tmp = statList.Value.ToArray();
+                                Array.Sort(tmp);
+                                statList.Value = new List<Animation.Key>(tmp);
+                            }
                         }
                         foreach (var bone in BonesHierarchy)
                             transforms.Add(bone, default);
