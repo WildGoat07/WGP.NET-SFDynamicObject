@@ -132,9 +132,12 @@ namespace WGP.SFDynamicObject
                         {
                             foreach (var statList in currentAnim.Bones)
                             {
-                                var tmp = statList.Value.ToArray();
-                                Array.Sort(tmp);
-                                statList.Value = new List<Animation.Key>(tmp);
+                                if (statList.Value != null)
+                                {
+                                    var tmp = statList.Value.ToArray();
+                                    Array.Sort(tmp);
+                                    statList.Value = new List<Animation.Key>(tmp);
+                                }
                             }
                         }
                         foreach (var bone in BonesHierarchy)
