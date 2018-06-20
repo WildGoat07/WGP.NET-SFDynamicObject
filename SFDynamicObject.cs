@@ -235,6 +235,11 @@ namespace WGP.SFDynamicObject
         /// Chronometer of the animation. Need to be set to animate.
         /// </summary>
         public Chronometer Chronometer { get; set; }
+        /// <summary>
+        /// Loads an object from a file.
+        /// </summary>
+        /// <param name="path">Path to the file.</param>
+        /// <param name="manager">Used manager.</param>
         public void LoadFromFile(string path, ResourceManager manager = null)
         {
             var stream = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read);
@@ -249,7 +254,11 @@ namespace WGP.SFDynamicObject
             }
             stream.Close();
         }
-
+        /// <summary>
+        /// Loads an object from a stream.
+        /// </summary>
+        /// <param name="stream">stream.</param>
+        /// <param name="manager">Used manager.</param>
         public void LoadFromStream(System.IO.Stream stream, ResourceManager manager = null)
         {
             const string WrongFile = "Wrong data type or corrupted data";
@@ -702,6 +711,11 @@ namespace WGP.SFDynamicObject
                 throw new Exception("Unable to load " + this, e);
             }
         }
+        /// <summary>
+        /// Loads an object from the memory.
+        /// </summary>
+        /// <param name="buffer">bytes in the memory.</param>
+        /// <param name="manager">Used manager.</param>
         public void LoadFromMemory(byte[] buffer, ResourceManager manager = null)
         {
             var stream = new System.IO.MemoryStream(buffer);
@@ -715,12 +729,18 @@ namespace WGP.SFDynamicObject
                 throw new Exception("Unable to load from the memory", e);
             }
         }
-        public void SaveToFile(string path)
+        /// <summary>
+        /// Saves the object to a stream.
+        /// </summary>
+        /// <param name="stream"></param>
+        public void SaveToStream(System.IO.Stream stream)
         {
+            if (stream == null)
+                throw new ArgumentNullException("stream");
+            if (!stream.CanWrite)
+                throw new Exception("Can't write in the stream");
             try
             {
-                var stream = new System.IO.FileStream(path, System.IO.FileMode.OpenOrCreate, System.IO.FileAccess.Write);
-
                 stream.Write(new byte[] { (byte)'W', (byte)'G', (byte)'D', (byte)'O' }, 0, 4);
 
                 {
