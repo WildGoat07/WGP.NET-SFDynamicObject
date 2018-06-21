@@ -136,7 +136,8 @@ namespace WGP.SFDynamicObject
                                 {
                                     var tmp = statList.Value.ToArray();
                                     Array.Sort(tmp);
-                                    statList.Value = new List<Animation.Key>(tmp);
+                                    statList.Value.Clear();
+                                    statList.Value.AddRange(tmp);
                                 }
                             }
                         }
