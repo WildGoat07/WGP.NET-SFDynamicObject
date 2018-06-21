@@ -106,7 +106,7 @@ namespace WGP.SFDynamicObject
                         SFML.Graphics.Texture tex = new SFML.Graphics.Texture(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path), duo.Path));
 
                         var res = new Resource();
-                        res.Path = duo.Path;
+                        res.Path = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path), duo.Path);
                         res.Data = tex;
                         Add(duo.ID, res);
                     }
@@ -122,7 +122,7 @@ namespace WGP.SFDynamicObject
                         SFML.Graphics.Font tex = new SFML.Graphics.Font(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path), duo.Path));
 
                         var res = new Resource();
-                        res.Path = duo.Path;
+                        res.Path = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path), duo.Path);
                         res.Data = tex;
                         Add(duo.ID, res);
                     }
@@ -138,7 +138,7 @@ namespace WGP.SFDynamicObject
                         SFML.Audio.SoundBuffer tex = new SFML.Audio.SoundBuffer(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path), duo.Path));
 
                         var res = new Resource();
-                        res.Path = duo.Path;
+                        res.Path = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path), duo.Path);
                         res.Data = tex;
                         Add(duo.ID, res);
                     }
