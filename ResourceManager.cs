@@ -72,12 +72,13 @@ namespace WGP.SFDynamicObject
                     resourceList.Add(duo);
                 }
             }
-            var result = Newtonsoft.Json.JsonConvert.SerializeObject(resourceList.ToArray());
             try
             {
-                var stream = new System.IO.StreamWriter(path);
-                stream.Write(result);
-                stream.Close();
+                var serialiser = new Newtonsoft.Json.JsonSerializer();
+                serialiser.Formatting = Newtonsoft.Json.Formatting.Indented;
+                var sw = new System.IO.StreamWriter(path);
+                serialiser.Serialize(sw, resourceList.ToArray());
+                sw.Close();
             }
             catch (Exception e)
             {
@@ -96,6 +97,8 @@ namespace WGP.SFDynamicObject
             Clear();
 
             Duo[] array = Newtonsoft.Json.JsonConvert.DeserializeObject<Duo[]>(reader.ReadToEnd());
+
+            reader.Close();
 
             foreach (var duo in array)
             {

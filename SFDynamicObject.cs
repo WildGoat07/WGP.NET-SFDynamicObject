@@ -282,6 +282,7 @@ namespace WGP.SFDynamicObject
                         OutlineThickness = item.OutlineThickness,
                         TextureRect = item.TextureRect
                     };
+                    OperateTransform(tmp2, item.Transform);
                     if (item.TextureID != null)
                         tmp2.Texture = manager[item.TextureID].Data as Texture;
                     KeyValuePair<string, RectangleShape> tmp = new KeyValuePair<string, RectangleShape>(item.TextureID, tmp2);
@@ -314,7 +315,12 @@ namespace WGP.SFDynamicObject
             Animations.Clear();
             try
             {
-                FormatJSON input = Newtonsoft.Json.JsonConvert.DeserializeObject<FormatJSON>(stream.ReadString((uint)stream.ReadInt32()));
+                FormatJSON input;
+                {
+                    var sr = new System.IO.StreamReader(stream, Encoding.Unicode);
+                    var deser = new Newtonsoft.Json.JsonSerializer();
+                    input = deser.Deserialize<FormatJSON>(new Newtonsoft.Json.JsonTextReader(sr));
+                }
                 if (input.Hierarchy != null)
                 {
                     foreach (var item in input.Hierarchy)
@@ -521,9 +527,11 @@ namespace WGP.SFDynamicObject
                     }
                     result.Animations = l.ToArray();
                 }
-                var str = Newtonsoft.Json.JsonConvert.SerializeObject(result);
-                stream.WriteInt32(str.Length);
-                stream.WriteString(str);
+                var serial = new Newtonsoft.Json.JsonSerializer();
+                serial.Formatting = Newtonsoft.Json.Formatting.Indented;
+                var sw = new System.IO.StreamWriter(stream, Encoding.Unicode);
+                serial.Serialize(sw, result);
+                sw.Flush();
             }
             catch (Exception e)
             {
