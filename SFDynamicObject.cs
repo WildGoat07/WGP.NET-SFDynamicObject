@@ -54,24 +54,27 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// The hierarchy of the bones. All bones must be here. The order in the hierarchy will be the order of drawing the sprites from the bones.
         /// </summary>
-        public ICollection<Bone> BonesHierarchy { get; set; }
+        public List<Bone> BonesHierarchy { get; set; }
         /// <summary>
         /// The list of the master bones. All child bones must NOT be referenced here.
         /// </summary>
-        public ICollection<Bone> MasterBones { get; set; }
+        public List<Bone> MasterBones { get; set; }
         /// <summary>
         /// Animations available for the bones.
         /// </summary>
-        public ICollection<Animation> Animations { get; set; }
+        public List<Animation> Animations { get; set; }
         private Animation currentAnim;
+        private Queue<string> buffer;
         /// <summary>
         /// Constructor.
         /// </summary>
         public SFDynamicObject()
         {
-            BonesHierarchy = null;
-            MasterBones = null;
-            Animations = null;
+            buffer = new Queue<string>();
+            BonesHierarchy = new List<Bone>();
+            MasterBones = new List<Bone>();
+            Animations = new List<Animation>();
+            currentAnim = null;
             ResetAnimation();
         }
         /// <summary>
@@ -114,10 +117,13 @@ namespace WGP.SFDynamicObject
         /// </summary>
         /// <param name="animName">Name of the animation to load.</param>
         /// <param name="reset">Reset the chronometer.</param>
-        public void LoadAnimation(string animName, bool reset = true)
+        /// <param name="queue">Queue containing the following animations to play once the current is finished.</param>
+        public void LoadAnimation(string animName, bool reset = true, params string[] queue)
         {
             if (Animations == null)
                 throw new Exception("No animations provided");
+            if (queue != null)
+                buffer = new Queue<string>(queue);
             if (animName == null)
                 currentAnim = null;
             else
@@ -134,15 +140,12 @@ namespace WGP.SFDynamicObject
                             {
                                 if (statList.Value != null)
                                 {
-                                    var tmp = statList.Value.ToArray();
-                                    Array.Sort(tmp);
-                                    statList.Value.Clear();
-                                    statList.Value.AddRange(tmp);
+                                    statList.Value.Sort();
                                 }
                             }
                         }
                         foreach (var bone in BonesHierarchy)
-                            transforms.Add(bone, default);
+                            transforms.Add(bone, new Transformable());
                         if (Chronometer != null && reset)
                             Chronometer.Restart();
                         return;
@@ -167,7 +170,11 @@ namespace WGP.SFDynamicObject
             if (currentAnim != null && Chronometer != null)
             {
                 if (Chronometer.ElapsedTime > currentAnim.Duration)
+                {
+                    if (buffer.Count > 0)
+                        LoadAnimation(buffer.Dequeue());
                     Chronometer.Restart();
+                }
                 Time currentTime = Chronometer.ElapsedTime;
 
                 foreach (var bone in BonesHierarchy)
@@ -255,6 +262,41 @@ namespace WGP.SFDynamicObject
             }
             stream.Close();
         }
+        internal Bone OperateBone(BoneJSON bone, ResourceManager manager)
+        {
+            Bone result = new Bone();
+            result.Name = bone.Name;
+            OperateTransform(result, bone.Transform);
+            if (bone.Sprites == null)
+                result.AttachedSprites = null;
+            else
+            {
+                result.AttachedSprites = new List<KeyValuePair<string, RectangleShape>>();
+                foreach (var item in bone.Sprites)
+                {
+                    RectangleShape tmp2 = new RectangleShape()
+                    {
+                        Size = item.Size,
+                        FillColor = item.FillColor,
+                        OutlineColor = item.OutlineColor,
+                        OutlineThickness = item.OutlineThickness,
+                        TextureRect = item.TextureRect
+                    };
+                    if (item.TextureID != null)
+                        tmp2.Texture = manager[item.TextureID].Data as Texture;
+                    KeyValuePair<string, RectangleShape> tmp = new KeyValuePair<string, RectangleShape>(item.TextureID, tmp2);
+                    result.AttachedSprites.Add(tmp);
+                }
+            }
+            return result;
+        }
+        internal void OperateTransform(Transformable tr, TransformJSON trjson)
+        {
+            tr.Position = trjson.Position;
+            tr.Origin = trjson.Origin;
+            tr.Scale = trjson.Scale;
+            tr.Rotation = trjson.Rotation;
+        }
         /// <summary>
         /// Loads an object from a stream.
         /// </summary>
@@ -263,453 +305,78 @@ namespace WGP.SFDynamicObject
         public void LoadFromStream(System.IO.Stream stream, ResourceManager manager = null)
         {
             const string WrongFile = "Wrong data type or corrupted data";
+            if (stream == null)
+                throw new ArgumentNullException("stream");
+            if (!stream.CanRead)
+                throw new Exception("Can't read from the stream");
+            BonesHierarchy.Clear();
+            MasterBones.Clear();
+            Animations.Clear();
             try
             {
+                FormatJSON input = Newtonsoft.Json.JsonConvert.DeserializeObject<FormatJSON>(stream.ReadString((uint)stream.ReadInt32()));
+                if (input.Hierarchy != null)
                 {
-                    var bytes = new byte[4];
-                    stream.Read(bytes, 0, 4);
-                    if (bytes[0] != 'W' ||
-                        bytes[1] != 'G' ||
-                        bytes[2] != 'D' ||
-                        bytes[3] != 'O')
-                        throw new Exception(WrongFile);
-                }
-                int numBones;
-                {
-                    var bytes = new byte[sizeof(int)];
-                    if (stream.Read(bytes, 0, bytes.Length) == 0)
-                        throw new Exception(WrongFile);
-                    numBones = BitConverter.ToInt32(bytes, 0);
-                }
-                if (numBones > 0)
-                    BonesHierarchy = new List<Bone>();
-                for (int i = 0; i < numBones; i++)
-                {
-                    Bone bone = new Bone();
-                    BonesHierarchy.Add(bone);
-                    int sizeName;
-                    var sizeB = new byte[sizeof(int)];
-                    if (stream.Read(sizeB, 0, sizeB.Length) == 0)
-                        throw new Exception(WrongFile);
-                    sizeName = BitConverter.ToInt32(sizeB, 0);
-                    var nameB = new byte[sizeName];
-                    if (stream.Read(nameB, 0, nameB.Length) == 0 && sizeName > 0)
-                        throw new Exception(WrongFile);
-                    bone.Name = ByteToString(nameB, nameB.Length);
-
+                    foreach (var item in input.Hierarchy)
                     {
-                        var vec = new Vector2f();
-                        var vecX = new byte[sizeof(float)];
-                        var vecY = new byte[sizeof(float)];
-                        if (stream.Read(vecX, 0, vecX.Length) == 0)
-                            throw new Exception(WrongFile);
-                        if (stream.Read(vecY, 0, vecY.Length) == 0)
-                            throw new Exception(WrongFile);
-                        vec.X = BitConverter.ToSingle(vecX, 0);
-                        vec.Y = BitConverter.ToSingle(vecY, 0);
-                        bone.Position = vec;
+                        BonesHierarchy.Add(OperateBone(item, manager));
                     }
+                    foreach (var item in input.Hierarchy)
                     {
-                        var vec = new Vector2f();
-                        var vecX = new byte[sizeof(float)];
-                        var vecY = new byte[sizeof(float)];
-                        if (stream.Read(vecX, 0, vecX.Length) == 0)
-                            throw new Exception(WrongFile);
-                        if (stream.Read(vecY, 0, vecY.Length) == 0)
-                            throw new Exception(WrongFile);
-                        vec.X = BitConverter.ToSingle(vecX, 0);
-                        vec.Y = BitConverter.ToSingle(vecY, 0);
-                        bone.Origin = vec;
-                    }
-                    {
-                        var vec = new Vector2f();
-                        var vecX = new byte[sizeof(float)];
-                        var vecY = new byte[sizeof(float)];
-                        if (stream.Read(vecX, 0, vecX.Length) == 0)
-                            throw new Exception(WrongFile);
-                        if (stream.Read(vecY, 0, vecY.Length) == 0)
-                            throw new Exception(WrongFile);
-                        vec.X = BitConverter.ToSingle(vecX, 0);
-                        vec.Y = BitConverter.ToSingle(vecY, 0);
-                        bone.Scale = vec;
-                    }
-                    {
-                        float rot;
-                        var rotB = new byte[sizeof(float)];
-                        if (stream.Read(rotB, 0, rotB.Length) == 0)
-                            throw new Exception(WrongFile);
-                        rot = BitConverter.ToSingle(rotB, 0);
-                        bone.Rotation = rot;
-                    }
-                    int numbChild;
-                    {
-                        var bytes = new byte[sizeof(int)];
-                        if (stream.Read(bytes, 0, bytes.Length) == 0)
-                            throw new Exception(WrongFile);
-                        numbChild = BitConverter.ToInt32(bytes, 0);
-                    }
-                    if (numbChild > 0)
-                        bone.ChildBones = new List<Bone>();
-                    for (int j = 0;j<numbChild;j++)
-                    {
-                        var tmp = new Bone();
-                        int sizeNameChild;
-                        var bytes = new byte[sizeof(int)];
-                        if (stream.Read(bytes, 0, bytes.Length) == 0)
-                            throw new Exception(WrongFile);
-                        sizeNameChild = BitConverter.ToInt32(bytes, 0);
-                        bytes = new byte[sizeNameChild];
-                        if (stream.Read(bytes, 0, bytes.Length) == 0 && sizeNameChild > 0)
-                            throw new Exception(WrongFile);
-                        tmp.Name = ByteToString(bytes, bytes.Length);
-                        bone.ChildBones.Add(tmp);
-                    }
-                }
-                foreach (var bone in BonesHierarchy)
-                {
-                    var listChild = new List<Bone>();
-                    if (bone.ChildBones != null)
-                    {
-                        foreach (var child in bone.ChildBones)
+                        if (item.Children != null)
                         {
-                            Bone match = null;
-                            foreach (var originalBone in BonesHierarchy)
+                            Bone bone = BonesHierarchy.Find((b) => b.Name == item.Name);
+                            bone.ChildBones = new List<Bone>();
+                            foreach (var child in item.Children)
                             {
-                                if (originalBone.Name == child.Name)
-                                {
-                                    match = originalBone;
-                                    break;
-                                }
+                                bone.ChildBones.Add(BonesHierarchy.Find((b) => b.Name == child));
                             }
-                            if (match == null)
-                                throw new Exception("No bone named \"" + child.Name + "\" as child of the bone named \"" + bone.Name + "\"");
-                            listChild.Add(match);
                         }
                     }
-                    bone.ChildBones = listChild;
                 }
-                int numMaster;
+                if (input.Masters != null)
                 {
-                    var bytes = new byte[sizeof(int)];
-                    if (stream.Read(bytes, 0, bytes.Length) == 0)
-                        throw new Exception(WrongFile);
-                    numMaster = BitConverter.ToInt32(bytes, 0);
-                }
-                if (numMaster > 0)
-                    MasterBones = new List<Bone>();
-                for (int i = 0; i < numMaster; i++)
-                {
-                    int sizeName;
-                    var bytes = new byte[sizeof(int)];
-                    if (stream.Read(bytes, 0, bytes.Length) == 0)
-                        throw new Exception(WrongFile);
-                    sizeName = BitConverter.ToInt32(bytes, 0);
-                    string name;
-                    bytes = new byte[sizeName];
-                    if (stream.Read(bytes, 0, bytes.Length) == 0 && sizeName > 0)
-                        throw new Exception(WrongFile);
-                    name = ByteToString(bytes, bytes.Length);
-                    Bone match = null;
-                    foreach (var originalBone in BonesHierarchy)
+                    foreach (var item in input.Masters)
                     {
-                        if (originalBone.Name == name)
+                        MasterBones.Add(BonesHierarchy.Find((b) => b.Name == item));
+                    }
+                }
+                if (input.Animations != null)
+                {
+                    foreach (var item1 in input.Animations)
+                    {
+                        Animation tmp1 = new Animation();
+                        tmp1.Name = item1.Name;
+                        tmp1.Duration = Time.FromMicroseconds(item1.Duration);
+                        tmp1.Bones = new List<Animation.Couple<string, List<Animation.Key>>>();
+                        if (item1.Bones != null)
                         {
-                            match = originalBone;
-                            break;
-                        }
-                    }
-                    if (match == null)
-                        throw new Exception("No bone named \"" + name + "\" as master bone");
-                    MasterBones.Add(match);
-                }
-                int numAnim;
-                {
-                    var bytes = new byte[sizeof(int)];
-                    if (stream.Read(bytes, 0, bytes.Length) == 0)
-                        throw new Exception(WrongFile);
-                    numAnim = BitConverter.ToInt32(bytes, 0);
-                }
-                if (numAnim > 0)
-                    Animations = new List<Animation>();
-                for (int i = 0; i < numAnim; i++)
-                {
-                    Animation tmp = new Animation();
-                    {
-                        int sizeName;
-                        var bytes = new byte[sizeof(int)];
-                        if (stream.Read(bytes, 0, bytes.Length) == 0)
-                            throw new Exception(WrongFile);
-                        sizeName = BitConverter.ToInt32(bytes, 0);
-                        bytes = new byte[sizeName];
-                        if (stream.Read(bytes, 0, bytes.Length) == 0 && sizeName > 0)
-                            throw new Exception(WrongFile);
-                        tmp.Name = ByteToString(bytes, bytes.Length);
-                    }
-                    {
-                        var bytes = new byte[sizeof(long)];
-                        if (stream.Read(bytes, 0, bytes.Length) == 0)
-                            throw new Exception(WrongFile);
-                        tmp.Duration = Time.FromMicroseconds(BitConverter.ToInt64(bytes, 0));
-                    }
-                    {
-                        int numBone;
-                        var bytes = new byte[sizeof(int)];
-                        if (stream.Read(bytes, 0, bytes.Length) == 0)
-                            throw new Exception(WrongFile);
-                        numBone = BitConverter.ToInt32(bytes, 0);
-                        if (numBone > 0)
-                            tmp.Bones = new List<Animation.Couple<string, List<Animation.Key>>>();
-                        for (int j = 0;j<numBone;j++)
-                        {
-                            string boneName;
+                            foreach (var item2 in item1.Bones)
                             {
-                                int sizeName;
-                                bytes = new byte[sizeof(int)];
-                                if (stream.Read(bytes, 0, bytes.Length) == 0)
-                                    throw new Exception(WrongFile);
-                                sizeName = BitConverter.ToInt32(bytes, 0);
-                                bytes = new byte[sizeName];
-                                if (stream.Read(bytes, 0, bytes.Length) == 0 && sizeName > 0)
-                                    throw new Exception(WrongFile);
-                                boneName = ByteToString(bytes, bytes.Length);
+                                Animation.Couple<string, List<Animation.Key>> tmp2 = new Animation.Couple<string, List<Animation.Key>>();
+                                tmp2.Key = item2.BoneName;
+                                tmp2.Value = new List<Animation.Key>();
+                                if (item2.Keys != null)
+                                {
+                                    foreach (var item3 in item2.Keys)
+                                    {
+                                        Animation.Key tmp3 = new Animation.Key();
+                                        tmp3.Transform = new Transformable();
+                                        tmp3.Position = Time.FromMicroseconds(item3.Position);
+                                        OperateTransform(tmp3.Transform, item3.Transform);
+                                        tmp2.Value.Add(tmp3);
+                                    }
+                                }
+                                tmp1.Bones.Add(tmp2);
                             }
-                            int numKeys;
-                            {
-                                bytes = new byte[sizeof(int)];
-                                if (stream.Read(bytes, 0, bytes.Length) == 0)
-                                    throw new Exception(WrongFile);
-                                numKeys = BitConverter.ToInt32(bytes, 0);
-                            }
-                            var keys = new List<Animation.Key>();
-                            for (int k = 0;k<numKeys;k++)
-                            {
-                                Animation.Key tmpKey = new Animation.Key();
-                                tmpKey.Transform = new Transformable();
-                                {
-                                    bytes = new byte[sizeof(long)];
-                                    if (stream.Read(bytes, 0, bytes.Length) == 0)
-                                        throw new Exception(WrongFile);
-                                    tmpKey.Position = Time.FromMicroseconds(BitConverter.ToInt64(bytes, 0));
-                                }
-                                {
-                                    var vec = new Vector2f();
-                                    var vecX = new byte[sizeof(float)];
-                                    var vecY = new byte[sizeof(float)];
-                                    if (stream.Read(vecX, 0, vecX.Length) == 0)
-                                        throw new Exception(WrongFile);
-                                    if (stream.Read(vecY, 0, vecY.Length) == 0)
-                                        throw new Exception(WrongFile);
-                                    vec.X = BitConverter.ToSingle(vecX, 0);
-                                    vec.Y = BitConverter.ToSingle(vecY, 0);
-                                    tmpKey.Transform.Position = vec;
-                                }
-                                {
-                                    var vec = new Vector2f();
-                                    var vecX = new byte[sizeof(float)];
-                                    var vecY = new byte[sizeof(float)];
-                                    if (stream.Read(vecX, 0, vecX.Length) == 0)
-                                        throw new Exception(WrongFile);
-                                    if (stream.Read(vecY, 0, vecY.Length) == 0)
-                                        throw new Exception(WrongFile);
-                                    vec.X = BitConverter.ToSingle(vecX, 0);
-                                    vec.Y = BitConverter.ToSingle(vecY, 0);
-                                    tmpKey.Transform.Origin = vec;
-                                }
-                                {
-                                    var vec = new Vector2f();
-                                    var vecX = new byte[sizeof(float)];
-                                    var vecY = new byte[sizeof(float)];
-                                    if (stream.Read(vecX, 0, vecX.Length) == 0)
-                                        throw new Exception(WrongFile);
-                                    if (stream.Read(vecY, 0, vecY.Length) == 0)
-                                        throw new Exception(WrongFile);
-                                    vec.X = BitConverter.ToSingle(vecX, 0);
-                                    vec.Y = BitConverter.ToSingle(vecY, 0);
-                                    tmpKey.Transform.Scale = vec;
-                                }
-                                {
-                                    float rot;
-                                    var rotB = new byte[sizeof(float)];
-                                    if (stream.Read(rotB, 0, rotB.Length) == 0)
-                                        throw new Exception(WrongFile);
-                                    rot = BitConverter.ToSingle(rotB, 0);
-                                    tmpKey.Transform.Rotation = rot;
-                                }
-                                keys.Add(tmpKey);
-                            }
-                            tmp.Bones.Add(new Animation.Couple<string, List<Animation.Key>>() { Key = boneName, Value = keys });
                         }
+                        Animations.Add(tmp1);
                     }
-                    Animations.Add(tmp);
-                }
-                int numSprite;
-                {
-                    var bytes = new byte[sizeof(int)];
-                    if (stream.Read(bytes, 0, bytes.Length) == 0)
-                        throw new Exception(WrongFile);
-                    numSprite = BitConverter.ToInt32(bytes, 0);
-                }
-                for (int i = 0;i<numSprite;i++)
-                {
-                    string boneName;
-                    string textureName;
-                    Bone affectedBone = null;
-                    RectangleShape shape = new RectangleShape();
-                    {
-                        int sizeName;
-                        var bytes = new byte[sizeof(int)];
-                        if (stream.Read(bytes, 0, bytes.Length) == 0)
-                            throw new Exception(WrongFile);
-                        sizeName = BitConverter.ToInt32(bytes, 0);
-                        bytes = new byte[sizeName];
-                        if (stream.Read(bytes, 0, bytes.Length) == 0 && sizeName > 0)
-                            throw new Exception(WrongFile);
-                        boneName = ByteToString(bytes, bytes.Length);
-                    }
-                    {
-                        int sizeName;
-                        var bytes = new byte[sizeof(int)];
-                        if (stream.Read(bytes, 0, bytes.Length) == 0)
-                            throw new Exception(WrongFile);
-                        sizeName = BitConverter.ToInt32(bytes, 0);
-                        bytes = new byte[sizeName];
-                        if (stream.Read(bytes, 0, bytes.Length) == 0 && sizeName > 0)
-                            throw new Exception(WrongFile);
-                        textureName = ByteToString(bytes, bytes.Length);
-                    }
-                    foreach (var bone in BonesHierarchy)
-                    {
-                        if (bone.Name == boneName)
-                        {
-                            affectedBone = bone;
-                            break;
-                        }
-                    }
-                    if (affectedBone == null)
-                        throw new Exception("No bone named \"" + boneName + "\" found for the sprite using the texture \"" + textureName + "\"");
-                    if (affectedBone.AttachedSprites == null)
-                        affectedBone.AttachedSprites = new List<KeyValuePair<string, RectangleShape>>();
-                    if (manager != null && textureName.Length > 0)
-                    {
-                        if (manager[textureName].Data is Texture)
-                            shape.Texture = (Texture)manager[textureName].Data;
-                        else
-                            throw new Exception("\"" + textureName + "\"is a " + textureName.GetType() + ", not a Texture");
-                    }
-                    else if (manager == null && textureName.Length > 0)
-                        throw new Exception("The provided manager doesn't contain \"" + textureName + "\" or is null");
-                    {
-                        var vec = new Vector2f();
-                        var vecX = new byte[sizeof(float)];
-                        var vecY = new byte[sizeof(float)];
-                        if (stream.Read(vecX, 0, vecX.Length) == 0)
-                            throw new Exception(WrongFile);
-                        if (stream.Read(vecY, 0, vecY.Length) == 0)
-                            throw new Exception(WrongFile);
-                        vec.X = BitConverter.ToSingle(vecX, 0);
-                        vec.Y = BitConverter.ToSingle(vecY, 0);
-                        shape.Position = vec;
-                    }
-                    {
-                        var vec = new Vector2f();
-                        var vecX = new byte[sizeof(float)];
-                        var vecY = new byte[sizeof(float)];
-                        if (stream.Read(vecX, 0, vecX.Length) == 0)
-                            throw new Exception(WrongFile);
-                        if (stream.Read(vecY, 0, vecY.Length) == 0)
-                            throw new Exception(WrongFile);
-                        vec.X = BitConverter.ToSingle(vecX, 0);
-                        vec.Y = BitConverter.ToSingle(vecY, 0);
-                        shape.Origin = vec;
-                    }
-                    {
-                        var vec = new Vector2f();
-                        var vecX = new byte[sizeof(float)];
-                        var vecY = new byte[sizeof(float)];
-                        if (stream.Read(vecX, 0, vecX.Length) == 0)
-                            throw new Exception(WrongFile);
-                        if (stream.Read(vecY, 0, vecY.Length) == 0)
-                            throw new Exception(WrongFile);
-                        vec.X = BitConverter.ToSingle(vecX, 0);
-                        vec.Y = BitConverter.ToSingle(vecY, 0);
-                        shape.Scale = vec;
-                    }
-                    {
-                        float rot;
-                        var rotB = new byte[sizeof(float)];
-                        if (stream.Read(rotB, 0, rotB.Length) == 0)
-                            throw new Exception(WrongFile);
-                        rot = BitConverter.ToSingle(rotB, 0);
-                        shape.Rotation = rot;
-                    }
-                    {
-                        var vec = new Vector2f();
-                        var vecX = new byte[sizeof(float)];
-                        var vecY = new byte[sizeof(float)];
-                        if (stream.Read(vecX, 0, vecX.Length) == 0)
-                            throw new Exception(WrongFile);
-                        if (stream.Read(vecY, 0, vecY.Length) == 0)
-                            throw new Exception(WrongFile);
-                        vec.X = BitConverter.ToSingle(vecX, 0);
-                        vec.Y = BitConverter.ToSingle(vecY, 0);
-                        shape.Size = vec;
-                    }
-                    {
-                        var rect = new IntRect();
-                        var l = new byte[sizeof(int)];
-                        var t = new byte[sizeof(int)];
-                        var w = new byte[sizeof(int)];
-                        var h = new byte[sizeof(int)];
-                        if (stream.Read(l, 0, l.Length) == 0)
-                            throw new Exception(WrongFile);
-                        if (stream.Read(t, 0, t.Length) == 0)
-                            throw new Exception(WrongFile);
-                        if (stream.Read(w, 0, w.Length) == 0)
-                            throw new Exception(WrongFile);
-                        if (stream.Read(h, 0, h.Length) == 0)
-                            throw new Exception(WrongFile);
-                        rect.Left = BitConverter.ToInt32(l, 0);
-                        rect.Top = BitConverter.ToInt32(t, 0);
-                        rect.Width = BitConverter.ToInt32(w, 0);
-                        rect.Height = BitConverter.ToInt32(h, 0);
-                        shape.TextureRect = rect;
-                    }
-                    {
-                        var color = new Color();
-                        var bytes = new byte[4 * sizeof(byte)];
-                        if (stream.Read(bytes, 0, bytes.Length) == 0)
-                            throw new Exception(WrongFile);
-                        color.R = bytes[0];
-                        color.G = bytes[1];
-                        color.B = bytes[2];
-                        color.A = bytes[3];
-                        shape.FillColor = color;
-                    }
-                    {
-                        var color = new Color();
-                        var bytes = new byte[4 * sizeof(byte)];
-                        if (stream.Read(bytes, 0, bytes.Length) == 0)
-                            throw new Exception(WrongFile);
-                        color.R = bytes[0];
-                        color.G = bytes[1];
-                        color.B = bytes[2];
-                        color.A = bytes[3];
-                        shape.OutlineColor = color;
-                    }
-                    {
-                        float oT;
-                        var oTB = new byte[sizeof(float)];
-                        if (stream.Read(oTB, 0, oTB.Length) == 0)
-                            throw new Exception(WrongFile);
-                        oT = BitConverter.ToSingle(oTB, 0);
-                        shape.OutlineThickness = oT;
-                    }
-                    affectedBone.AttachedSprites.Add(new KeyValuePair<string, RectangleShape>(textureName, shape));
                 }
             }
             catch (Exception e)
             {
-                throw new Exception("Unable to load " + this, e);
+                throw new Exception(WrongFile, e);
             }
         }
         /// <summary>
@@ -730,6 +397,53 @@ namespace WGP.SFDynamicObject
                 throw new Exception("Unable to load from the memory", e);
             }
         }
+        internal BoneJSON OperateBone(Bone bone)
+        {
+            BoneJSON result = new BoneJSON();
+            result.Name = bone.Name;
+            result.Transform = OperateTransform(bone);
+            if (bone.AttachedSprites == null)
+                result.Sprites = null;
+            else
+            {
+                var l = new List<SpriteJSON>();
+                foreach (var item in bone.AttachedSprites)
+                {
+                    SpriteJSON tmp1 = new SpriteJSON();
+                    tmp1.FillColor = item.Value.FillColor;
+                    tmp1.OutlineColor = item.Value.FillColor;
+                    tmp1.OutlineThickness = item.Value.OutlineThickness;
+                    tmp1.Size = item.Value.Size;
+                    tmp1.TextureID = item.Key;
+                    tmp1.TextureRect = item.Value.TextureRect;
+                    tmp1.Transform = OperateTransform(item.Value);
+                    l.Add(tmp1);
+                }
+                result.Sprites = l.ToArray();
+            }
+            if (bone.ChildBones == null)
+                result.Children = null;
+            else
+            {
+                var l = new List<string>();
+                foreach (var item in bone.ChildBones)
+                {
+                    l.Add(item.Name);
+                }
+                result.Children = l.ToArray();
+            }
+            return result;
+        }
+        internal TransformJSON OperateTransform(Transformable tr)
+        {
+            return new TransformJSON
+            {
+                Position = tr.Position,
+                Scale = tr.Scale,
+                Origin = tr.Origin,
+                Rotation = tr.Rotation
+            };
+        }
         /// <summary>
         /// Saves the object to a stream.
         /// </summary>
@@ -742,262 +456,79 @@ namespace WGP.SFDynamicObject
                 throw new Exception("Can't write in the stream");
             try
             {
-                stream.Write(new byte[] { (byte)'W', (byte)'G', (byte)'D', (byte)'O' }, 0, 4);
+                FormatJSON result = new FormatJSON();
 
-                {
-                    var bytes = BitConverter.GetBytes((int)BonesHierarchy.Count);
-                    stream.Write(bytes, 0, bytes.Length);
-                }
-                foreach (var bone in BonesHierarchy)
-                {
-                    var nameB = StringToByte(bone.Name);
-                    var sizeB = BitConverter.GetBytes((int)nameB.Length);
-                    stream.Write(sizeB, 0, sizeB.Length);
-                    stream.Write(nameB, 0, nameB.Length);
-
-                    {
-                        var vecX = BitConverter.GetBytes((float)bone.Position.X);
-                        var vecY = BitConverter.GetBytes((float)bone.Position.Y);
-                        stream.Write(vecX, 0, vecX.Length);
-                        stream.Write(vecY, 0, vecY.Length);
-                    }
-                    {
-                        var vecX = BitConverter.GetBytes((float)bone.Origin.X);
-                        var vecY = BitConverter.GetBytes((float)bone.Origin.Y);
-                        stream.Write(vecX, 0, vecX.Length);
-                        stream.Write(vecY, 0, vecY.Length);
-                    }
-                    {
-                        var vecX = BitConverter.GetBytes((float)bone.Scale.X);
-                        var vecY = BitConverter.GetBytes((float)bone.Scale.Y);
-                        stream.Write(vecX, 0, vecX.Length);
-                        stream.Write(vecY, 0, vecY.Length);
-                    }
-                    {
-                        var rot = BitConverter.GetBytes((float)bone.Rotation);
-                        stream.Write(rot, 0, rot.Length);
-                    }
-
-                    byte[] childNumB;
-                    if (bone.ChildBones != null)
-                        childNumB = BitConverter.GetBytes((int)bone.ChildBones.Count);
-                    else
-                        childNumB = BitConverter.GetBytes((int)0);
-                    stream.Write(childNumB, 0, childNumB.Length);
-
-                    if (bone.ChildBones != null)
-                    {
-                        foreach (var child in bone.ChildBones)
-                        {
-                            var childNameB = StringToByte(child.Name);
-                            var childSizeB = BitConverter.GetBytes((int)childNameB.Length);
-                            stream.Write(childSizeB, 0, childSizeB.Length);
-                            stream.Write(childNameB, 0, childNameB.Length);
-                        }
-                    }
-                }
-                {
-                    var bytes = BitConverter.GetBytes((int)MasterBones.Count);
-                    stream.Write(bytes, 0, bytes.Length);
-                }
-                foreach (var bone in MasterBones)
-                {
-                    var nameB = StringToByte(bone.Name);
-                    var sizeB = BitConverter.GetBytes((int)nameB.Length);
-                    stream.Write(sizeB, 0, sizeB.Length);
-                    stream.Write(nameB, 0, nameB.Length);
-                }
-                if (Animations != null)
-                {
-                    {
-                        var bytes = BitConverter.GetBytes((int)Animations.Count);
-                        stream.Write(bytes, 0, bytes.Length);
-                    }
-                    foreach (var animation in Animations)
-                    {
-                        {
-                            var nameB = StringToByte(animation.Name);
-                            var sizeB = BitConverter.GetBytes((int)nameB.Length);
-                            stream.Write(sizeB, 0, sizeB.Length);
-                            stream.Write(nameB, 0, nameB.Length);
-                        }
-                        {
-                            var bytes = BitConverter.GetBytes((long)animation.Duration.AsMicroseconds());
-                            stream.Write(bytes, 0, bytes.Length);
-                        }
-                        {
-                            var bytes = BitConverter.GetBytes((int)animation.Bones.Count);
-                            stream.Write(bytes, 0, bytes.Length);
-                        }
-                        foreach (var boneKeys in animation.Bones)
-                        {
-                            {
-                                var nameB = StringToByte(boneKeys.Key);
-                                var sizeB = BitConverter.GetBytes((int)nameB.Length);
-                                stream.Write(sizeB, 0, sizeB.Length);
-                                stream.Write(nameB, 0, nameB.Length);
-                            }
-                            {
-                                var bytes = BitConverter.GetBytes((int)boneKeys.Value.Count);
-                                stream.Write(bytes, 0, bytes.Length);
-                            }
-                            foreach (var key in boneKeys.Value)
-                            {
-                                {
-                                    var bytes = BitConverter.GetBytes((long)key.Position.AsMicroseconds());
-                                    stream.Write(bytes, 0, bytes.Length);
-                                }
-                                {
-                                    var vecX = BitConverter.GetBytes((float)key.Transform.Position.X);
-                                    var vecY = BitConverter.GetBytes((float)key.Transform.Position.Y);
-                                    stream.Write(vecX, 0, vecX.Length);
-                                    stream.Write(vecY, 0, vecY.Length);
-                                }
-                                {
-                                    var vecX = BitConverter.GetBytes((float)key.Transform.Origin.X);
-                                    var vecY = BitConverter.GetBytes((float)key.Transform.Origin.Y);
-                                    stream.Write(vecX, 0, vecX.Length);
-                                    stream.Write(vecY, 0, vecY.Length);
-                                }
-                                {
-                                    var vecX = BitConverter.GetBytes((float)key.Transform.Scale.X);
-                                    var vecY = BitConverter.GetBytes((float)key.Transform.Scale.Y);
-                                    stream.Write(vecX, 0, vecX.Length);
-                                    stream.Write(vecY, 0, vecY.Length);
-                                }
-                                {
-                                    var rot = BitConverter.GetBytes((float)key.Transform.Rotation);
-                                    stream.Write(rot, 0, rot.Length);
-                                }
-                            }
-                        }
-                    }
-                }
+                if (BonesHierarchy == null)
+                    result.Hierarchy = null;
                 else
                 {
-                    var bytes = BitConverter.GetBytes((int)0);
-                    stream.Write(bytes, 0, bytes.Length);
-                }
-                int numSprite = 0;
-                foreach (var bone in BonesHierarchy)
-                {
-                    if (bone.AttachedSprites != null)
-                        numSprite += bone.AttachedSprites.Count;
-                }
-                {
-                    var bytes = BitConverter.GetBytes((int)numSprite);
-                    stream.Write(bytes, 0, bytes.Length);
-                }
-                foreach (var bone in BonesHierarchy)
-                {
-                    if (bone.AttachedSprites != null)
+                    var l = new List<BoneJSON>();
+                    foreach (var item in BonesHierarchy)
                     {
-                        foreach (var sprite in bone.AttachedSprites)
-                        {
-                            {
-                                var nameB = StringToByte(bone.Name);
-                                var sizeB = BitConverter.GetBytes((int)nameB.Length);
-                                stream.Write(sizeB, 0, sizeB.Length);
-                                stream.Write(nameB, 0, nameB.Length);
-                            }
-                            if (sprite.Key != null && sprite.Key != "")
-                            {
-                                var nameB = StringToByte(sprite.Key);
-                                var sizeB = BitConverter.GetBytes((int)nameB.Length);
-                                stream.Write(sizeB, 0, sizeB.Length);
-                                stream.Write(nameB, 0, nameB.Length);
-                            }
-                            else
-                            {
-                                var bytes = BitConverter.GetBytes((int)0);
-                                stream.Write(bytes, 0, bytes.Length);
-                            }
-                            {
-                                var vecX = BitConverter.GetBytes((float)sprite.Value.Position.X);
-                                var vecY = BitConverter.GetBytes((float)sprite.Value.Position.Y);
-                                stream.Write(vecX, 0, vecX.Length);
-                                stream.Write(vecY, 0, vecY.Length);
-                            }
-                            {
-                                var vecX = BitConverter.GetBytes((float)sprite.Value.Origin.X);
-                                var vecY = BitConverter.GetBytes((float)sprite.Value.Origin.Y);
-                                stream.Write(vecX, 0, vecX.Length);
-                                stream.Write(vecY, 0, vecY.Length);
-                            }
-                            {
-                                var vecX = BitConverter.GetBytes((float)sprite.Value.Scale.X);
-                                var vecY = BitConverter.GetBytes((float)sprite.Value.Scale.Y);
-                                stream.Write(vecX, 0, vecX.Length);
-                                stream.Write(vecY, 0, vecY.Length);
-                            }
-                            {
-                                var rot = BitConverter.GetBytes((float)sprite.Value.Rotation);
-                                stream.Write(rot, 0, rot.Length);
-                            }
-                            {
-                                var vecX = BitConverter.GetBytes((float)sprite.Value.Size.X);
-                                var vecY = BitConverter.GetBytes((float)sprite.Value.Size.Y);
-                                stream.Write(vecX, 0, vecX.Length);
-                                stream.Write(vecY, 0, vecY.Length);
-                            }
-                            {
-                                var vecL = BitConverter.GetBytes((int)sprite.Value.TextureRect.Left);
-                                var vecT = BitConverter.GetBytes((int)sprite.Value.TextureRect.Top);
-                                var vecW = BitConverter.GetBytes((int)sprite.Value.TextureRect.Width);
-                                var vecH = BitConverter.GetBytes((int)sprite.Value.TextureRect.Height);
-                                stream.Write(vecL, 0, vecL.Length);
-                                stream.Write(vecT, 0, vecT.Length);
-                                stream.Write(vecW, 0, vecW.Length);
-                                stream.Write(vecH, 0, vecH.Length);
-                            }
-                            {
-                                var color = new byte[] { sprite.Value.FillColor.R, sprite.Value.FillColor.G, sprite.Value.FillColor.B, sprite.Value.FillColor.A };
-                                stream.Write(color, 0, color.Length);
-                            }
-                            {
-                                var color = new byte[] { sprite.Value.OutlineColor.R, sprite.Value.OutlineColor.G, sprite.Value.OutlineColor.B, sprite.Value.OutlineColor.A };
-                                stream.Write(color, 0, color.Length);
-                            }
-                            {
-                                var bytes = BitConverter.GetBytes((float)sprite.Value.OutlineThickness);
-                                stream.Write(bytes, 0, bytes.Length);
-                            }
-                        }
+                        l.Add(OperateBone(item));
                     }
+                    result.Hierarchy = l.ToArray();
                 }
-
-
-                stream.Close();
-            }
-            catch(Exception e)
-            {
-                throw new Exception("Failed to save the object to the file", e);
-            }
-        }
-        static internal byte[] StringToByte(string s)
-        {
-            var result = new byte[s.Length * sizeof(char)];
-            int index = 0;
-            foreach (var character in s)
-            {
-                var charB = BitConverter.GetBytes(character);
-                foreach (var oct in charB)
+                if (MasterBones == null)
+                    result.Masters = null;
+                else
                 {
-                    result[index] = oct;
-                    index++;
+                    var l = new List<string>();
+                    foreach (var item in MasterBones)
+                    {
+                        l.Add(item.Name);
+                    }
+                    result.Masters = l.ToArray();
                 }
+                if (Animations == null)
+                    result.Animations = null;
+                else
+                {
+                    var l = new List<AnimationJSON>();
+                    foreach (var item in Animations)
+                    {
+                        AnimationJSON tmp1 = new AnimationJSON();
+                        tmp1.Name = item.Name;
+                        tmp1.Duration = item.Duration.AsMicroseconds();
+                        if (item.Bones == null)
+                            tmp1.Bones = null;
+                        else
+                        {
+                            var l2 = new List<AnimatedBoneJSON>();
+                            foreach (var item2 in item.Bones)
+                            {
+                                AnimatedBoneJSON tmp2 = new AnimatedBoneJSON();
+                                tmp2.BoneName = item2.Key;
+                                if (item2.Value == null)
+                                    tmp2.Keys = null;
+                                else
+                                {
+                                    var l3 = new List<KeyJSON>();
+                                    foreach (var item3 in item2.Value)
+                                    {
+                                        KeyJSON tmp3 = new KeyJSON();
+                                        tmp3.Position = item3.Position.AsMicroseconds();
+                                        tmp3.Transform = OperateTransform(item3.Transform);
+                                        l3.Add(tmp3);
+                                    }
+                                    tmp2.Keys = l3.ToArray();
+                                }
+                                l2.Add(tmp2);
+                            }
+                            tmp1.Bones = l2.ToArray();
+                        }
+                        l.Add(tmp1);
+                    }
+                    result.Animations = l.ToArray();
+                }
+                var str = Newtonsoft.Json.JsonConvert.SerializeObject(result);
+                stream.WriteInt32(str.Length);
+                stream.WriteString(str);
             }
-            return result;
-        }
-        static internal string ByteToString(byte[] buffer, int count, int startIndex = 0)
-        {
-            string result = "";
-            for (int index = 0;index < count;index+=2)
+            catch (Exception e)
             {
-                var character = BitConverter.ToChar(buffer, startIndex + index);
-                result += character;
+                throw new Exception("Failed to save the object to the stream", e);
             }
-            return result;
         }
     }
     /// <summary>
@@ -1069,7 +600,7 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// The childs of the bone. They will be relative to their parent.
         /// </summary>
-        public ICollection<Bone> ChildBones { get; set; }
+        public List<Bone> ChildBones { get; set; }
         /// <summary>
         /// The absolute transforms of the bone. For internal uses only.
         /// </summary>
@@ -1077,7 +608,7 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// The list of sprites affected by the changes of the bone. Be careful of the order (the order of drawing). The string is the name of the texture in the texture manager.
         /// </summary>
-        public ICollection<KeyValuePair<string, RectangleShape>> AttachedSprites { get; set; }
+        public List<KeyValuePair<string, RectangleShape>> AttachedSprites { get; set; }
         /// <summary>
         /// The name of the bone. Needed for animations.
         /// </summary>
