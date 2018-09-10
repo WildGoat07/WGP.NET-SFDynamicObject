@@ -50,6 +50,8 @@ namespace WGP.SFDynamicObject
                 }
             }
         }
+        private Dictionary<Bone, Transformable> oldAnimState;
+        private Chronometer fadeChrono;
         private Dictionary<Bone, Transformable> transforms;
         /// <summary>
         /// The hierarchy of the bones. All bones must be here. The order in the hierarchy will be the order of drawing the sprites from the bones.
@@ -63,13 +65,21 @@ namespace WGP.SFDynamicObject
         /// Animations available for the bones.
         /// </summary>
         public List<Animation> Animations { get; set; }
+        /// <summary>
+        /// Time between animations to smooth the transition.
+        /// </summary>
+        public Time TransitionTime { get; set; }
         private Animation currentAnim;
         private Queue<string> buffer;
+        private Chronometer chronometer;
+
         /// <summary>
         /// Constructor.
         /// </summary>
         public SFDynamicObject()
         {
+            oldAnimState = null;
+            TransitionTime = Time.Zero;
             buffer = new Queue<string>();
             BonesHierarchy = new List<Bone>();
             MasterBones = new List<Bone>();
@@ -120,6 +130,8 @@ namespace WGP.SFDynamicObject
         /// <param name="queue">Queue containing the following animations to play once the current is finished.</param>
         public void LoadAnimation(string animName, bool reset = true, params string[] queue)
         {
+            if (currentAnim != null)
+                oldAnimState = new Dictionary<Bone, Transformable>(transforms);
             if (Animations == null)
                 throw new Exception("No animations provided");
             if (queue != null)
@@ -147,7 +159,10 @@ namespace WGP.SFDynamicObject
                         foreach (var bone in BonesHierarchy)
                             transforms.Add(bone, new Transformable());
                         if (Chronometer != null && reset)
+                        {
                             Chronometer.Restart();
+                            fadeChrono.Restart();
+                        }
                         return;
                     }
                 }
@@ -176,6 +191,7 @@ namespace WGP.SFDynamicObject
                     Chronometer.Restart();
                 }
                 Time currentTime = Chronometer.ElapsedTime;
+                Time currentFadeTime = fadeChrono.ElapsedTime;
 
                 foreach (var bone in BonesHierarchy)
                 {
@@ -215,6 +231,14 @@ namespace WGP.SFDynamicObject
                             tr.Scale = Utilities.Interpolation(perc, first.Transform.Scale, second.Transform.Scale);
                             tr.Rotation = Utilities.Interpolation(perc, first.Transform.Rotation, second.Transform.Rotation);
                             tr.Origin = Utilities.Interpolation(perc, first.Transform.Origin, second.Transform.Origin);
+                            if (currentFadeTime < TransitionTime && oldAnimState != null)
+                            {
+                                float perc2 = Utilities.Percent(currentFadeTime.AsSeconds(), 0, TransitionTime.AsSeconds());
+                                tr.Position = Utilities.Interpolation(perc2, oldAnimState[bone].Position, tr.Position);
+                                tr.Scale = Utilities.Interpolation(perc2, oldAnimState[bone].Scale, tr.Scale);
+                                tr.Rotation = Utilities.Interpolation(perc2, oldAnimState[bone].Rotation, tr.Rotation);
+                                tr.Origin = Utilities.Interpolation(perc2, oldAnimState[bone].Origin, tr.Origin);
+                            }
                             transforms[bone] = tr;
                         }
                     }
@@ -242,7 +266,15 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// Chronometer of the animation. Need to be set to animate.
         /// </summary>
-        public Chronometer Chronometer { get; set; }
+        public Chronometer Chronometer
+        {
+            private get => chronometer;
+            set
+            {
+                chronometer = new Chronometer(value);
+                fadeChrono = new Chronometer(value);
+            }
+        }
         /// <summary>
         /// Loads an object from a file.
         /// </summary>
@@ -255,7 +287,7 @@ namespace WGP.SFDynamicObject
             {
                 LoadFromStream(stream, manager);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 stream.Close();
                 throw new Exception("Unable to load from the file", e);
@@ -397,7 +429,7 @@ namespace WGP.SFDynamicObject
             {
                 LoadFromStream(stream, manager);
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 stream.Close();
                 throw new Exception("Unable to load from the memory", e);
