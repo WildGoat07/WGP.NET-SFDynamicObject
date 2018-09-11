@@ -136,6 +136,8 @@ namespace WGP.SFDynamicObject
                 throw new Exception("No animations provided");
             if (queue != null)
                 buffer = new Queue<string>(queue);
+            else
+                buffer.Clear();
             if (animName == null)
                 currentAnim = null;
             else
