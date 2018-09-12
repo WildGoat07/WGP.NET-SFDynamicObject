@@ -623,6 +623,26 @@ namespace WGP.SFDynamicObject
             }
         }
     }
+    public class Couple<T, U> : IEquatable<Couple<T, U>> where T : IEquatable<T>
+    {
+        public Couple()
+        {
+        }
+
+        public Couple(T key, U value)
+        {
+            Key = key;
+            Value = value;
+        }
+
+        public T Key { get; set; }
+        public U Value { get; set; }
+
+        public bool Equals(Couple<T, U> other)
+        {
+            return Key.Equals(other.Key);
+        }
+    }
     /// <summary>
     /// An animation. contains all the key of the bones to animate.
     /// </summary>
@@ -651,16 +671,6 @@ namespace WGP.SFDynamicObject
                 if (obj is Key)
                     return CompareTo((Key)obj);
                 throw new InvalidOperationException("Invalid type :" + obj.GetType());
-            }
-        }
-        public class Couple<T, U>: IEquatable<Couple<T, U>> where T : IEquatable<T>
-        {
-            public T Key { get; set; }
-            public U Value { get; set; }
-
-            public bool Equals(Couple<T, U> other)
-            {
-                return Key.Equals(other.Key);
             }
         }
         /// <summary>
