@@ -100,12 +100,15 @@ namespace WGP.SFDynamicObject
                 {
                     foreach (var sprite in bone.AttachedSprites)
                     {
-                        if (Manager.ContainsKey(sprite.Key))
                         {
-                            sprite.Value.Texture = (Texture)Manager[sprite.Key].Data;
+                            if (sprite.Key != null)
+                                if (Manager.ContainsKey(sprite.Key))
+                                {
+                                    sprite.Value.Texture = (Texture)Manager[sprite.Key].Data;
+                                }
+                                else
+                                    sprite.Value.Texture = null;
                         }
-                        else
-                            sprite.Value.Texture = null;
                     }
                 }
             }
@@ -331,13 +334,12 @@ namespace WGP.SFDynamicObject
         /// Loads an object from a file.
         /// </summary>
         /// <param name="path">Path to the file.</param>
-        /// <param name="manager">Used manager.</param>
-        public void LoadFromFile(string path, ResourceManager manager = null)
+        public void LoadFromFile(string path)
         {
             var stream = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read);
             try
             {
-                LoadFromStream(stream, manager);
+                LoadFromStream(stream);
             }
             catch (Exception e)
             {
@@ -346,7 +348,7 @@ namespace WGP.SFDynamicObject
             }
             stream.Close();
         }
-        internal Bone OperateBone(BoneJSON bone, ResourceManager manager)
+        internal Bone OperateBone(BoneJSON bone)
         {
             Bone result = new Bone();
             result.Name = bone.Name;
@@ -367,8 +369,6 @@ namespace WGP.SFDynamicObject
                         TextureRect = item.TextureRect
                     };
                     OperateTransform(tmp2, item.Transform);
-                    if (item.TextureID != null)
-                        tmp2.Texture = manager[item.TextureID].Data as Texture;
                     Couple<string, RectangleShape> tmp = new Couple<string, RectangleShape>(item.TextureID, tmp2);
                     result.AttachedSprites.Add(tmp);
                 }
@@ -386,8 +386,7 @@ namespace WGP.SFDynamicObject
         /// Loads an object from a stream.
         /// </summary>
         /// <param name="stream">stream.</param>
-        /// <param name="manager">Used manager.</param>
-        public void LoadFromStream(System.IO.Stream stream, ResourceManager manager = null)
+        public void LoadFromStream(System.IO.Stream stream)
         {
             const string WrongFile = "Wrong data type or corrupted data";
             if (stream == null)
@@ -409,7 +408,7 @@ namespace WGP.SFDynamicObject
                 {
                     foreach (var item in input.Hierarchy)
                     {
-                        BonesHierarchy.Add(OperateBone(item, manager));
+                        BonesHierarchy.Add(OperateBone(item));
                     }
                     foreach (var item in input.Hierarchy)
                     {
@@ -473,13 +472,12 @@ namespace WGP.SFDynamicObject
         /// Loads an object from the memory.
         /// </summary>
         /// <param name="buffer">bytes in the memory.</param>
-        /// <param name="manager">Used manager.</param>
-        public void LoadFromMemory(byte[] buffer, ResourceManager manager = null)
+        public void LoadFromMemory(byte[] buffer)
         {
             var stream = new System.IO.MemoryStream(buffer);
             try
             {
-                LoadFromStream(stream, manager);
+                LoadFromStream(stream);
             }
             catch (Exception e)
             {
