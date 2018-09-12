@@ -41,11 +41,29 @@ namespace WGP.SFDynamicObject
             {
                 if (bone.AttachedSprites != null)
                 {
+                    if (bone.DrawTempSpritesFirst && bone.TemporarySprites != null)
+                    {
+                        foreach (var sprite in bone.TemporarySprites)
+                        {
+                            RenderStates st = new RenderStates(states);
+                            st.Transform *= bone.ComputedTransform;
+                            target.Draw(sprite, st);
+                        }
+                    }
                     foreach (var sprite in bone.AttachedSprites)
                     {
                         RenderStates st = new RenderStates(states);
                         st.Transform *= bone.ComputedTransform;
                         target.Draw(sprite.Value, st);
+                    }
+                    if (!bone.DrawTempSpritesFirst && bone.TemporarySprites != null)
+                    {
+                        foreach (var sprite in bone.TemporarySprites)
+                        {
+                            RenderStates st = new RenderStates(states);
+                            st.Transform *= bone.ComputedTransform;
+                            target.Draw(sprite, st);
+                        }
                     }
                 }
             }
@@ -69,6 +87,30 @@ namespace WGP.SFDynamicObject
         /// Time between animations to smooth the transition.
         /// </summary>
         public Time TransitionTime { get; set; }
+        /// <summary>
+        /// Sets the ResourceManager used by the object. It should contain the necessary resources for the object.
+        /// </summary>
+        public ResourceManager Manager
+        {
+            get => _manager;
+            set
+            {
+                _manager = value;
+                foreach (var bone in BonesHierarchy)
+                {
+                    foreach (var sprite in bone.AttachedSprites)
+                    {
+                        if (Manager.ContainsKey(sprite.Key))
+                        {
+                            sprite.Value.Texture = (Texture)Manager[sprite.Key].Data;
+                        }
+                        else
+                            sprite.Value.Texture = null;
+                    }
+                }
+            }
+        }
+        private ResourceManager _manager;
         private Animation currentAnim;
         private Queue<string> buffer;
         private Chronometer chronometer;
@@ -197,7 +239,7 @@ namespace WGP.SFDynamicObject
 
                 foreach (var bone in BonesHierarchy)
                 {
-                    if (currentAnim.Bones != null && currentAnim.Bones.Contains(new Animation.Couple<string, List<Animation.Key>>() { Key = bone.Name }))
+                    if (currentAnim.Bones != null && currentAnim.Bones.Contains(new Couple<string, List<Animation.Key>>() { Key = bone.Name }))
                     {
                         if (currentAnim.Bones.First((b) => b.Key == bone.Name).Value != null && currentAnim.Bones.First((b) => b.Key == bone.Name).Value.Count() == 0)
                         {
@@ -278,6 +320,14 @@ namespace WGP.SFDynamicObject
             }
         }
         /// <summary>
+        /// The current time of the internal chronometer.
+        /// </summary>
+        public Time CurrentTime
+        {
+            get => chronometer.ElapsedTime;
+            set => chronometer.ElapsedTime = value;
+        }
+        /// <summary>
         /// Loads an object from a file.
         /// </summary>
         /// <param name="path">Path to the file.</param>
@@ -305,7 +355,7 @@ namespace WGP.SFDynamicObject
                 result.AttachedSprites = null;
             else
             {
-                result.AttachedSprites = new List<KeyValuePair<string, RectangleShape>>();
+                result.AttachedSprites = new List<Couple<string, RectangleShape>>();
                 foreach (var item in bone.Sprites)
                 {
                     RectangleShape tmp2 = new RectangleShape()
@@ -319,7 +369,7 @@ namespace WGP.SFDynamicObject
                     OperateTransform(tmp2, item.Transform);
                     if (item.TextureID != null)
                         tmp2.Texture = manager[item.TextureID].Data as Texture;
-                    KeyValuePair<string, RectangleShape> tmp = new KeyValuePair<string, RectangleShape>(item.TextureID, tmp2);
+                    Couple<string, RectangleShape> tmp = new Couple<string, RectangleShape>(item.TextureID, tmp2);
                     result.AttachedSprites.Add(tmp);
                 }
             }
@@ -388,12 +438,12 @@ namespace WGP.SFDynamicObject
                         Animation tmp1 = new Animation();
                         tmp1.Name = item1.Name;
                         tmp1.Duration = Time.FromMicroseconds(item1.Duration);
-                        tmp1.Bones = new List<Animation.Couple<string, List<Animation.Key>>>();
+                        tmp1.Bones = new List<Couple<string, List<Animation.Key>>>();
                         if (item1.Bones != null)
                         {
                             foreach (var item2 in item1.Bones)
                             {
-                                Animation.Couple<string, List<Animation.Key>> tmp2 = new Animation.Couple<string, List<Animation.Key>>();
+                                Couple<string, List<Animation.Key>> tmp2 = new Couple<string, List<Animation.Key>>();
                                 tmp2.Key = item2.BoneName;
                                 tmp2.Value = new List<Animation.Key>();
                                 if (item2.Keys != null)
@@ -639,6 +689,7 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class Bone : Transformable
     {
+        public bool DrawTempSpritesFirst { get; set; }
         /// <summary>
         /// The childs of the bone. They will be relative to their parent.
         /// </summary>
@@ -650,7 +701,11 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// The list of sprites affected by the changes of the bone. Be careful of the order (the order of drawing). The string is the name of the texture in the texture manager.
         /// </summary>
-        public List<KeyValuePair<string, RectangleShape>> AttachedSprites { get; set; }
+        public List<Couple<string, RectangleShape>> AttachedSprites { get; set; }
+        /// <summary>
+        /// The temporary sprites are not saved but they are drawn at the same time as the bone. They are usually used for small details that change often in a game.
+        /// </summary>
+        public List<Drawable> TemporarySprites { get; set; }
         /// <summary>
         /// The name of the bone. Needed for animations.
         /// </summary>
@@ -660,6 +715,8 @@ namespace WGP.SFDynamicObject
         /// </summary>
         public Bone()
         {
+            DrawTempSpritesFirst = false;
+            TemporarySprites = null;
             ChildBones = null;
             AttachedSprites = null;
             Name = null;
