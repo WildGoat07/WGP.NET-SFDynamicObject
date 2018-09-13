@@ -96,19 +96,30 @@ namespace WGP.SFDynamicObject
             set
             {
                 _manager = value;
-                foreach (var bone in BonesHierarchy)
+                if (_manager != null)
                 {
-                    foreach (var sprite in bone.AttachedSprites)
+                    foreach (var bone in BonesHierarchy)
                     {
+                        foreach (var sprite in bone.AttachedSprites)
                         {
-                            if (sprite.Key != null)
-                                if (Manager.ContainsKey(sprite.Key))
-                                {
-                                    sprite.Value.Texture = (Texture)Manager[sprite.Key].Data;
-                                }
-                                else
-                                    sprite.Value.Texture = null;
+                            {
+                                if (sprite.Key != null)
+                                    if (Manager.ContainsKey(sprite.Key))
+                                    {
+                                        sprite.Value.Texture = (Texture)Manager[sprite.Key].Data;
+                                    }
+                                    else
+                                        sprite.Value.Texture = null;
+                            }
                         }
+                    }
+                }
+                else
+                {
+                    foreach (var bone in BonesHierarchy)
+                    {
+                        foreach (var sprite in bone.AttachedSprites)
+                            sprite.Value.Texture = null;
                     }
                 }
             }
@@ -382,6 +393,10 @@ namespace WGP.SFDynamicObject
             tr.Scale = trjson.Scale;
             tr.Rotation = trjson.Rotation;
         }
+        /// <summary>
+        /// Reload the manager. If one of his texture which is used in this object has been changed, it will take effect.
+        /// </summary>
+        public void ReloadManager() => Manager = Manager;
         /// <summary>
         /// Loads an object from a stream.
         /// </summary>
