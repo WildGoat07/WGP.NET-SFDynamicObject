@@ -704,7 +704,7 @@ namespace WGP.SFDynamicObject
         public Animation()
         {
             Name = null;
-            Bones = null;
+            Bones = new List<Couple<string, List<Key>>>();
         }
     }
     /// <summary>
@@ -739,9 +739,9 @@ namespace WGP.SFDynamicObject
         public Bone()
         {
             DrawTempSpritesFirst = false;
-            TemporarySprites = null;
-            ChildBones = null;
-            AttachedSprites = null;
+            TemporarySprites = new List<Drawable>();
+            ChildBones = new List<Bone>();
+            AttachedSprites = new List<Couple<string, RectangleShape>>();
             Name = null;
         }
     }
