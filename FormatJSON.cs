@@ -48,6 +48,17 @@ namespace WGP.SFDynamicObject
     {
         public long Position;
         public TransformJSON Transform;
+        public byte Opacity;
+        public int PosFunction;
+        public float PosCoeff;
+        public int OriFunction;
+        public float OriCoeff;
+        public int ScaFunction;
+        public float ScaCoeff;
+        public int RotFunction;
+        public float RotCoeff;
+        public int OpaFunction;
+        public float OpaCoeff;
     }
     internal struct AnimatedBoneJSON
     {

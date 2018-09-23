@@ -26,6 +26,18 @@ namespace WGP.SFDynamicObject
                 bone.ComputedTransform = parent.ComputedTransform * final.Transform;
             else
                 bone.ComputedTransform = final.Transform;
+            if (bone.AttachedSprites != null)
+            {
+                foreach (var sprite in bone.AttachedSprites)
+                {
+                    var c = sprite.Value.FillColor;
+                    c.A = bone.Opacity;
+                    var oc = sprite.Value.OutlineColor;
+                    oc.A = bone.Opacity;
+                    sprite.Value.FillColor = c;
+                    sprite.Value.OutlineColor = oc;
+                }
+            }
             if (bone.ChildBones != null)
             {
                 foreach (var child in bone.ChildBones)
@@ -39,31 +51,31 @@ namespace WGP.SFDynamicObject
             states.Transform *= Transform;
             foreach (var bone in BonesHierarchy)
             {
+                if (bone.DrawTempSpritesFirst && bone.TemporarySprites != null)
+                {
+                    foreach (var sprite in bone.TemporarySprites)
+                    {
+                        RenderStates st = new RenderStates(states);
+                        st.Transform *= bone.ComputedTransform;
+                        target.Draw(sprite, st);
+                    }
+                }
                 if (bone.AttachedSprites != null)
                 {
-                    if (bone.DrawTempSpritesFirst && bone.TemporarySprites != null)
-                    {
-                        foreach (var sprite in bone.TemporarySprites)
-                        {
-                            RenderStates st = new RenderStates(states);
-                            st.Transform *= bone.ComputedTransform;
-                            target.Draw(sprite, st);
-                        }
-                    }
                     foreach (var sprite in bone.AttachedSprites)
                     {
                         RenderStates st = new RenderStates(states);
                         st.Transform *= bone.ComputedTransform;
                         target.Draw(sprite.Value, st);
                     }
-                    if (!bone.DrawTempSpritesFirst && bone.TemporarySprites != null)
+                }
+                if (!bone.DrawTempSpritesFirst && bone.TemporarySprites != null)
+                {
+                    foreach (var sprite in bone.TemporarySprites)
                     {
-                        foreach (var sprite in bone.TemporarySprites)
-                        {
-                            RenderStates st = new RenderStates(states);
-                            st.Transform *= bone.ComputedTransform;
-                            target.Draw(sprite, st);
-                        }
+                        RenderStates st = new RenderStates(states);
+                        st.Transform *= bone.ComputedTransform;
+                        target.Draw(sprite, st);
                     }
                 }
             }
@@ -260,7 +272,7 @@ namespace WGP.SFDynamicObject
                             transforms[bone] = new Transformable();
                             continue;
                         }
-                        List<Animation.Key> states;
+                        List<Animation.Key> states = null;
                         try
                         {
                             var tmp = currentAnim.Bones.First((b) => b.Key == bone.Name);
@@ -284,11 +296,61 @@ namespace WGP.SFDynamicObject
                                     second = state;
                             }
                             Transformable tr = new Transformable();
-                            float perc = Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds());
-                            tr.Position = Utilities.Interpolation(perc, first.Transform.Position, second.Transform.Position);
-                            tr.Scale = Utilities.Interpolation(perc, first.Transform.Scale, second.Transform.Scale);
-                            tr.Rotation = Utilities.Interpolation(perc, first.Transform.Rotation, second.Transform.Rotation);
-                            tr.Origin = Utilities.Interpolation(perc, first.Transform.Origin, second.Transform.Origin);
+                            float posPerc = 0;
+                            float oriPerc = 0;
+                            float scaPerc = 0;
+                            float rotPerc = 0;
+                            float opaPerc = 0;
+                            if (second.PosFunction == Animation.Key.Fct.LINEAR)
+                                posPerc = Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds());
+                            else if (second.PosFunction == Animation.Key.Fct.ROOT)
+                                posPerc = new PowFunction(1f / second.PosFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.PosFunction == Animation.Key.Fct.POWER)
+                                posPerc = new PowFunction(second.PosFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.PosFunction == Animation.Key.Fct.GAUSS)
+                                posPerc = new ProgressiveFunction(second.PosFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+
+                            if (second.OriginFunction == Animation.Key.Fct.LINEAR)
+                                oriPerc = Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds());
+                            else if (second.OriginFunction == Animation.Key.Fct.ROOT)
+                                oriPerc = new PowFunction(1f / second.OriginFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.OriginFunction == Animation.Key.Fct.POWER)
+                                oriPerc = new PowFunction(second.OriginFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.OriginFunction == Animation.Key.Fct.GAUSS)
+                                oriPerc = new ProgressiveFunction(second.OriginFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+
+                            if (second.ScaleFunction == Animation.Key.Fct.LINEAR)
+                                scaPerc = Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds());
+                            else if (second.ScaleFunction == Animation.Key.Fct.ROOT)
+                                scaPerc = new PowFunction(1f / second.ScaleFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.ScaleFunction == Animation.Key.Fct.POWER)
+                                scaPerc = new PowFunction(second.ScaleFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.ScaleFunction == Animation.Key.Fct.GAUSS)
+                                scaPerc = new ProgressiveFunction(second.ScaleFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+
+                            if (second.RotFunction == Animation.Key.Fct.LINEAR)
+                                rotPerc = Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds());
+                            else if (second.RotFunction == Animation.Key.Fct.ROOT)
+                                rotPerc = new PowFunction(1f / second.RotFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.RotFunction == Animation.Key.Fct.POWER)
+                                rotPerc = new PowFunction(second.RotFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.RotFunction == Animation.Key.Fct.GAUSS)
+                                rotPerc = new ProgressiveFunction(second.RotFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+
+                            if (second.OpacityFunction == Animation.Key.Fct.LINEAR)
+                                opaPerc = Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds());
+                            else if (second.OpacityFunction == Animation.Key.Fct.ROOT)
+                                opaPerc = new PowFunction(1f / second.OpacityFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.OpacityFunction == Animation.Key.Fct.POWER)
+                                opaPerc = new PowFunction(second.OpacityFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.OpacityFunction == Animation.Key.Fct.GAUSS)
+                                opaPerc = new ProgressiveFunction(second.OpacityFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+
+                            tr.Position = Utilities.Interpolation(posPerc, first.Transform.Position, second.Transform.Position);
+                            tr.Scale = Utilities.Interpolation(scaPerc, first.Transform.Scale, second.Transform.Scale);
+                            tr.Rotation = Utilities.Interpolation(rotPerc, first.Transform.Rotation, second.Transform.Rotation);
+                            tr.Origin = Utilities.Interpolation(oriPerc, first.Transform.Origin, second.Transform.Origin);
+                            bone.Opacity = (byte)Utilities.Interpolation(opaPerc, (float)first.Opacity, second.Opacity);
                             if (currentFadeTime < TransitionTime && oldAnimState != null)
                             {
                                 float perc2 = Utilities.Percent(currentFadeTime.AsSeconds(), 0, TransitionTime.AsSeconds());
@@ -312,6 +374,7 @@ namespace WGP.SFDynamicObject
             {
                 foreach (var bone in BonesHierarchy)
                 {
+                    bone.Opacity = 255;
                     transforms[bone] = new Transformable();
                     continue;
                 }
@@ -468,6 +531,17 @@ namespace WGP.SFDynamicObject
                                         tmp3.Transform = new Transformable();
                                         tmp3.Position = Time.FromMicroseconds(item3.Position);
                                         OperateTransform(tmp3.Transform, item3.Transform);
+                                        tmp3.Opacity = item3.Opacity;
+                                        tmp3.PosFctCoeff = item3.PosCoeff;
+                                        tmp3.PosFunction = (Animation.Key.Fct)item3.PosFunction;
+                                        tmp3.OriginFctCoeff = item3.OriCoeff;
+                                        tmp3.OriginFunction = (Animation.Key.Fct)item3.OriFunction;
+                                        tmp3.ScaleFctCoeff = item3.ScaCoeff;
+                                        tmp3.ScaleFunction = (Animation.Key.Fct)item3.ScaFunction;
+                                        tmp3.RotFctCoeff = item3.RotCoeff;
+                                        tmp3.RotFunction = (Animation.Key.Fct)item3.RotFunction;
+                                        tmp3.OpacityFctCoeff = item3.OpaCoeff;
+                                        tmp3.OpacityFunction = (Animation.Key.Fct)item3.OpaFunction;
                                         tmp2.Value.Add(tmp3);
                                     }
                                 }
@@ -612,6 +686,16 @@ namespace WGP.SFDynamicObject
                                         KeyJSON tmp3 = new KeyJSON();
                                         tmp3.Position = item3.Position.AsMicroseconds();
                                         tmp3.Transform = OperateTransform(item3.Transform);
+                                        tmp3.PosCoeff = item3.PosFctCoeff;
+                                        tmp3.PosFunction = (int)item3.PosFunction;
+                                        tmp3.OriCoeff = item3.OriginFctCoeff;
+                                        tmp3.OriFunction = (int)item3.OriginFunction;
+                                        tmp3.ScaCoeff = item3.ScaleFctCoeff;
+                                        tmp3.ScaFunction = (int)item3.ScaleFunction;
+                                        tmp3.RotCoeff = item3.RotFctCoeff;
+                                        tmp3.RotFunction = (int)item3.RotFunction;
+                                        tmp3.OpaCoeff = item3.OpacityFctCoeff;
+                                        tmp3.OpaFunction = (int)item3.OpacityFunction;
                                         l3.Add(tmp3);
                                     }
                                     tmp2.Keys = l3.ToArray();
@@ -666,6 +750,58 @@ namespace WGP.SFDynamicObject
         /// </summary>
         public class Key : IComparable<Key>, IComparable
         {
+            public enum Fct
+            {
+                LINEAR,
+                POWER,
+                ROOT,
+                GAUSS,
+                BINARY
+            }
+            /// <summary>
+            /// The opacity of the bone. Doesn't inherit from its parent.
+            /// </summary>
+            public byte Opacity { get; set; }
+            /// <summary>
+            /// Coefficient of the position function.
+            /// </summary>
+            public float PosFctCoeff { get; set; }
+            /// <summary>
+            /// How the position will be calculated.
+            /// </summary>
+            public Fct PosFunction { get; set; }
+            /// <summary>
+            /// Coefficient of the origin function.
+            /// </summary>
+            public float OriginFctCoeff { get; set; }
+            /// <summary>
+            /// How the origin will be calculated.
+            /// </summary>
+            public Fct OriginFunction { get; set; }
+            /// <summary>
+            /// Coefficient of the rotation function.
+            /// </summary>
+            public float RotFctCoeff { get; set; }
+            /// <summary>
+            /// How the rotation will be calculated.
+            /// </summary>
+            public Fct RotFunction { get; set; }
+            /// <summary>
+            /// Coefficient of the scale function.
+            /// </summary>
+            public float ScaleFctCoeff { get; set; }
+            /// <summary>
+            /// How the scale will be calculated.
+            /// </summary>
+            public Fct ScaleFunction { get; set; }
+            /// <summary>
+            /// Coefficient of the opacity function.
+            /// </summary>
+            public float OpacityFctCoeff { get; set; }
+            /// <summary>
+            /// How the position will be calculated.
+            /// </summary>
+            public Fct OpacityFunction { get; set; }
             /// <summary>
             /// The transformations to add (or multiply in the case of scaling) to the bone.
             /// </summary>
@@ -684,6 +820,24 @@ namespace WGP.SFDynamicObject
                 if (obj is Key)
                     return CompareTo((Key)obj);
                 throw new InvalidOperationException("Invalid type :" + obj.GetType());
+            }
+            /// <summary>
+            /// Constructor.
+            /// </summary>
+            public Key()
+            {
+                Transform = new Transformable();
+                PosFunction = Fct.LINEAR;
+                PosFctCoeff = 1;
+                OriginFunction = Fct.LINEAR;
+                OriginFctCoeff = 1;
+                ScaleFunction = Fct.LINEAR;
+                ScaleFctCoeff = 1;
+                RotFunction = Fct.LINEAR;
+                RotFctCoeff = 1;
+                OpacityFunction = Fct.LINEAR;
+                OpacityFctCoeff = 1;
+                Opacity = 255;
             }
         }
         /// <summary>
@@ -712,6 +866,13 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class Bone : Transformable
     {
+        /// <summary>
+        /// Opacity of the bone. Can only be changed using keys and animations.
+        /// </summary>
+        public byte Opacity { get; internal set; }
+        /// <summary>
+        /// This bone should draw its temporary sprites before its attached sprites ?
+        /// </summary>
         public bool DrawTempSpritesFirst { get; set; }
         /// <summary>
         /// The childs of the bone. They will be relative to their parent.
@@ -743,6 +904,7 @@ namespace WGP.SFDynamicObject
             ChildBones = new List<Bone>();
             AttachedSprites = new List<Couple<string, RectangleShape>>();
             Name = null;
+            Opacity = 255;
         }
     }
 }
