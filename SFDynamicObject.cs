@@ -696,6 +696,7 @@ namespace WGP.SFDynamicObject
                                         tmp3.RotFunction = (int)item3.RotFunction;
                                         tmp3.OpaCoeff = item3.OpacityFctCoeff;
                                         tmp3.OpaFunction = (int)item3.OpacityFunction;
+                                        tmp3.Opacity = item3.Opacity;
                                         l3.Add(tmp3);
                                     }
                                     tmp2.Keys = l3.ToArray();
