@@ -265,6 +265,7 @@ namespace WGP.SFDynamicObject
 
                 foreach (var bone in BonesHierarchy)
                 {
+                    bone.Opacity = 255;
                     if (currentAnim.Bones != null && currentAnim.Bones.Contains(new Couple<string, List<Animation.Key>>() { Key = bone.Name }))
                     {
                         if (currentAnim.Bones.First((b) => b.Key == bone.Name).Value != null && currentAnim.Bones.First((b) => b.Key == bone.Name).Value.Count() == 0)
