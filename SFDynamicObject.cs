@@ -14,6 +14,25 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class SFDynamicObject : Transformable, Drawable
     {
+        /// <summary>
+        /// Version of the current SFDynamicObject encoder/decoder.
+        /// </summary>
+        public static readonly Version CurrentVersion = new Version(1, 1, 0, 0);
+        /// <summary>
+        /// Version of the created object.
+        /// </summary>
+        public Version Version { get; private set; }
+        public class NewerVersionException : Exception
+        {
+            public Version CurrentVersion { get; }
+            public Version RequestedVersion { get; }
+            public NewerVersionException(Version FileVersion) : base("The file is in " + FileVersion + " but the API is in " + SFDynamicObject.CurrentVersion)
+            {
+                CurrentVersion = SFDynamicObject.CurrentVersion;
+                RequestedVersion = FileVersion;
+            }
+        }
+
         private void ComputeBone(Bone bone, Bone parent)
         {
             Transformable added = transforms[bone];
@@ -30,12 +49,13 @@ namespace WGP.SFDynamicObject
             {
                 foreach (var sprite in bone.AttachedSprites)
                 {
-                    var c = sprite.Value.FillColor;
+                    var c = bone.Color;
                     c.A = bone.Opacity;
-                    var oc = sprite.Value.OutlineColor;
+                    var oc = bone.OutlineColor;
                     oc.A = bone.Opacity;
                     sprite.Value.FillColor = c;
                     sprite.Value.OutlineColor = oc;
+                    sprite.Value.OutlineThickness = bone.OutlineThickness;
                 }
             }
             if (bone.ChildBones != null)
@@ -66,6 +86,21 @@ namespace WGP.SFDynamicObject
                     {
                         RenderStates st = new RenderStates(states);
                         st.Transform *= bone.ComputedTransform;
+                        switch (bone.BlendMode)
+                        {
+                            case BlendModeType.BLEND_ALPHA:
+                                st.BlendMode = BlendMode.Alpha;
+                                break;
+                            case BlendModeType.BLEND_ADD:
+                                st.BlendMode = BlendMode.Add;
+                                break;
+                            case BlendModeType.BLEND_MULT:
+                                st.BlendMode = BlendMode.Multiply;
+                                break;
+                            case BlendModeType.BLEND_SUB:
+                                st.BlendMode = new BlendMode(BlendMode.Factor.OneMinusDstColor, BlendMode.Factor.OneMinusSrcColor);
+                                break;
+                        }
                         target.Draw(sprite.Value, st);
                     }
                 }
@@ -146,6 +181,7 @@ namespace WGP.SFDynamicObject
         /// </summary>
         public SFDynamicObject()
         {
+            Version = CurrentVersion;
             oldAnimState = null;
             TransitionTime = Time.Zero;
             buffer = new Queue<string>();
@@ -245,6 +281,13 @@ namespace WGP.SFDynamicObject
         public void ResetAnimation()
         {
             transforms = new Dictionary<Bone, Transformable>();
+            foreach (var item in BonesHierarchy)
+            {
+                item.Color = Color.White;
+                item.OutlineColor = Color.White;
+                item.OutlineThickness = 0;
+                item.Opacity = 255;
+            }
             currentAnim = null;
         }
         /// <summary>
@@ -266,6 +309,9 @@ namespace WGP.SFDynamicObject
                 foreach (var bone in BonesHierarchy)
                 {
                     bone.Opacity = 255;
+                    bone.Color = Color.White;
+                    bone.OutlineColor = Color.White;
+                    bone.OutlineThickness = 0;
                     if (currentAnim.Bones != null && currentAnim.Bones.Contains(new Couple<string, List<Animation.Key>>() { Key = bone.Name }))
                     {
                         if (currentAnim.Bones.First((b) => b.Key == bone.Name).Value != null && currentAnim.Bones.First((b) => b.Key == bone.Name).Value.Count() == 0)
@@ -302,6 +348,9 @@ namespace WGP.SFDynamicObject
                             float scaPerc = 0;
                             float rotPerc = 0;
                             float opaPerc = 0;
+                            float ColorPerc = 0;
+                            float OColorPerc = 0;
+                            float OTPerc = 0;
                             if (second.PosFunction == Animation.Key.Fct.LINEAR)
                                 posPerc = Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds());
                             else if (second.PosFunction == Animation.Key.Fct.ROOT)
@@ -347,11 +396,49 @@ namespace WGP.SFDynamicObject
                             else if (second.OpacityFunction == Animation.Key.Fct.GAUSS)
                                 opaPerc = new ProgressiveFunction(second.OpacityFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
 
+                            if (second.ColorFunction == Animation.Key.Fct.LINEAR)
+                                ColorPerc = Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds());
+                            else if (second.ColorFunction == Animation.Key.Fct.ROOT)
+                                ColorPerc = new PowFunction(1f / second.ColorFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.ColorFunction == Animation.Key.Fct.POWER)
+                                ColorPerc = new PowFunction(second.ColorFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.ColorFunction == Animation.Key.Fct.GAUSS)
+                                ColorPerc = new ProgressiveFunction(second.ColorFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+
+                            if (second.OutlineColorFunction == Animation.Key.Fct.LINEAR)
+                                OColorPerc = Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds());
+                            else if (second.OutlineColorFunction == Animation.Key.Fct.ROOT)
+                                OColorPerc = new PowFunction(1f / second.OutlineColorFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.OutlineColorFunction == Animation.Key.Fct.POWER)
+                                OColorPerc = new PowFunction(second.OutlineColorFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.OutlineColorFunction == Animation.Key.Fct.GAUSS)
+                                OColorPerc = new ProgressiveFunction(second.OutlineColorFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+
+                            if (second.OutlineThicknessFunction == Animation.Key.Fct.LINEAR)
+                                OTPerc = Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds());
+                            else if (second.OutlineThicknessFunction == Animation.Key.Fct.ROOT)
+                                OTPerc = new PowFunction(1f / second.OutlineThicknessFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.OutlineThicknessFunction == Animation.Key.Fct.POWER)
+                                OTPerc = new PowFunction(second.OutlineThicknessFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+                            else if (second.OutlineThicknessFunction == Animation.Key.Fct.GAUSS)
+                                OTPerc = new ProgressiveFunction(second.OutlineThicknessFctCoeff).Interpolation(Utilities.Percent(currentTime.AsSeconds(), first.Position.AsSeconds(), second.Position.AsSeconds()), 0f, 1);
+
                             tr.Position = Utilities.Interpolation(posPerc, first.Transform.Position, second.Transform.Position);
                             tr.Scale = Utilities.Interpolation(scaPerc, first.Transform.Scale, second.Transform.Scale);
                             tr.Rotation = Utilities.Interpolation(rotPerc, first.Transform.Rotation, second.Transform.Rotation);
                             tr.Origin = Utilities.Interpolation(oriPerc, first.Transform.Origin, second.Transform.Origin);
                             bone.Opacity = (byte)Utilities.Interpolation(opaPerc, (float)first.Opacity, second.Opacity);
+                            bone.OutlineThickness = Utilities.Interpolation(OTPerc, first.OutlineThickness, second.OutlineThickness);
+                            bone.Color = new Color(
+                                (byte)Utilities.Interpolation(ColorPerc, (float)first.Color.R, second.Color.R),
+                                (byte)Utilities.Interpolation(ColorPerc, (float)first.Color.G, second.Color.G),
+                                (byte)Utilities.Interpolation(ColorPerc, (float)first.Color.B, second.Color.B)
+                                );
+                            bone.OutlineColor = new Color(
+                                (byte)Utilities.Interpolation(OColorPerc, (float)first.OutlineColor.R, second.OutlineColor.R),
+                                (byte)Utilities.Interpolation(OColorPerc, (float)first.OutlineColor.G, second.OutlineColor.G),
+                                (byte)Utilities.Interpolation(OColorPerc, (float)first.OutlineColor.B, second.OutlineColor.B)
+                                );
                             if (currentFadeTime < TransitionTime && oldAnimState != null)
                             {
                                 float perc2 = Utilities.Percent(currentFadeTime.AsSeconds(), 0, TransitionTime.AsSeconds());
@@ -409,12 +496,13 @@ namespace WGP.SFDynamicObject
         /// Loads an object from a file.
         /// </summary>
         /// <param name="path">Path to the file.</param>
-        public void LoadFromFile(string path)
+        /// <param name="parseNewerVersions">Does the object try to parse newer versions ?</param>
+        public void LoadFromFile(string path, bool parseNewerVersions = false)
         {
             var stream = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read);
             try
             {
-                LoadFromStream(stream);
+                LoadFromStream(stream, parseNewerVersions);
             }
             catch (Exception e)
             {
@@ -438,7 +526,6 @@ namespace WGP.SFDynamicObject
                     RectangleShape tmp2 = new RectangleShape()
                     {
                         Size = item.Size,
-                        FillColor = item.FillColor,
                         OutlineColor = item.OutlineColor,
                         OutlineThickness = item.OutlineThickness,
                         TextureRect = item.TextureRect
@@ -464,8 +551,9 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// Loads an object from a stream.
         /// </summary>
-        /// <param name="stream">stream.</param>
-        public void LoadFromStream(System.IO.Stream stream)
+        /// <param name="stream">Stream.</param>
+        /// <param name="parseNewerVersions">Does the object try to parse newer versions ?</param>
+        public void LoadFromStream(System.IO.Stream stream, bool parseNewerVersions = false)
         {
             const string WrongFile = "Wrong data type or corrupted data";
             if (stream == null)
@@ -481,8 +569,12 @@ namespace WGP.SFDynamicObject
                 {
                     var sr = new System.IO.StreamReader(stream, Encoding.Unicode);
                     var deser = new Newtonsoft.Json.JsonSerializer();
+                    deser.MissingMemberHandling = Newtonsoft.Json.MissingMemberHandling.Ignore;
                     input = deser.Deserialize<FormatJSON>(new Newtonsoft.Json.JsonTextReader(sr));
                 }
+                Version = input.Version;
+                if (input.Version > CurrentVersion && !parseNewerVersions)
+                    throw new NewerVersionException(input.Version);
                 if (input.Hierarchy != null)
                 {
                     foreach (var item in input.Hierarchy)
@@ -495,6 +587,7 @@ namespace WGP.SFDynamicObject
                         {
                             Bone bone = BonesHierarchy.Find((b) => b.Name == item.Name);
                             bone.ChildBones = new List<Bone>();
+                            bone.BlendMode = item.BlendMode;
                             foreach (var child in item.Children)
                             {
                                 bone.ChildBones.Add(BonesHierarchy.Find((b) => b.Name == child));
@@ -533,6 +626,9 @@ namespace WGP.SFDynamicObject
                                         tmp3.Position = Time.FromMicroseconds(item3.Position);
                                         OperateTransform(tmp3.Transform, item3.Transform);
                                         tmp3.Opacity = item3.Opacity;
+                                        tmp3.Color = item3.Color;
+                                        tmp3.OutlineColor = item3.OutlineColor;
+                                        tmp3.OutlineThickness = item3.OutlineThickness;
                                         tmp3.PosFctCoeff = item3.PosCoeff;
                                         tmp3.PosFunction = (Animation.Key.Fct)item3.PosFunction;
                                         tmp3.OriginFctCoeff = item3.OriCoeff;
@@ -543,6 +639,12 @@ namespace WGP.SFDynamicObject
                                         tmp3.RotFunction = (Animation.Key.Fct)item3.RotFunction;
                                         tmp3.OpacityFctCoeff = item3.OpaCoeff;
                                         tmp3.OpacityFunction = (Animation.Key.Fct)item3.OpaFunction;
+                                        tmp3.ColorFctCoeff = item3.ColCoeff;
+                                        tmp3.ColorFunction = (Animation.Key.Fct)item3.ColFunction;
+                                        tmp3.OutlineColorFctCoeff = item3.OCoCoeff;
+                                        tmp3.OutlineColorFunction = (Animation.Key.Fct)item3.OCoFunction;
+                                        tmp3.OutlineThicknessFctCoeff = item3.OThCoeff;
+                                        tmp3.OutlineThicknessFunction = (Animation.Key.Fct)item3.OThFunction;
                                         tmp2.Value.Add(tmp3);
                                     }
                                 }
@@ -562,9 +664,10 @@ namespace WGP.SFDynamicObject
         /// Loads an object from the memory.
         /// </summary>
         /// <param name="buffer">bytes in the memory.</param>
-        public void LoadFromMemory(byte[] buffer)
+        /// <param name="parseNewerVersions">Does the object try to parse newer versions ?</param>
+        public void LoadFromMemory(byte[] buffer, bool parseNewerVersions = false)
         {
-            var stream = new System.IO.MemoryStream(buffer);
+            var stream = new System.IO.MemoryStream(buffer, parseNewerVersions);
             try
             {
                 LoadFromStream(stream);
@@ -580,6 +683,7 @@ namespace WGP.SFDynamicObject
             BoneJSON result = new BoneJSON();
             result.Name = bone.Name;
             result.Transform = OperateTransform(bone);
+            result.BlendMode = bone.BlendMode;
             if (bone.AttachedSprites == null)
                 result.Sprites = null;
             else
@@ -588,7 +692,6 @@ namespace WGP.SFDynamicObject
                 foreach (var item in bone.AttachedSprites)
                 {
                     SpriteJSON tmp1 = new SpriteJSON();
-                    tmp1.FillColor = item.Value.FillColor;
                     tmp1.OutlineColor = item.Value.FillColor;
                     tmp1.OutlineThickness = item.Value.OutlineThickness;
                     tmp1.Size = item.Value.Size;
@@ -635,6 +738,7 @@ namespace WGP.SFDynamicObject
             try
             {
                 FormatJSON result = new FormatJSON();
+                result.Version = CurrentVersion;
 
                 if (BonesHierarchy == null)
                     result.Hierarchy = null;
@@ -698,6 +802,15 @@ namespace WGP.SFDynamicObject
                                         tmp3.OpaCoeff = item3.OpacityFctCoeff;
                                         tmp3.OpaFunction = (int)item3.OpacityFunction;
                                         tmp3.Opacity = item3.Opacity;
+                                        tmp3.ColCoeff = item3.ColorFctCoeff;
+                                        tmp3.ColFunction = (int)item3.ColorFunction;
+                                        tmp3.Color = item3.Color;
+                                        tmp3.OCoCoeff = item3.OutlineColorFctCoeff;
+                                        tmp3.OCoFunction = (int)item3.OutlineColorFunction;
+                                        tmp3.OutlineColor = item3.OutlineColor;
+                                        tmp3.OThCoeff = item3.OutlineThicknessFctCoeff;
+                                        tmp3.OThFunction = (int)item3.OutlineThicknessFunction;
+                                        tmp3.OutlineThickness = item3.OutlineThickness;
                                         l3.Add(tmp3);
                                     }
                                     tmp2.Keys = l3.ToArray();
@@ -765,9 +878,21 @@ namespace WGP.SFDynamicObject
             /// </summary>
             public byte Opacity { get; set; }
             /// <summary>
+            /// The color of the sprite.
+            /// </summary>
+            public Color Color { get; set; }
+            /// <summary>
             /// Coefficient of the position function.
             /// </summary>
             public float PosFctCoeff { get; set; }
+            /// <summary>
+            /// The outline color of the sprite.
+            /// </summary>
+            public Color OutlineColor { get; set; }
+            /// <summary>
+            /// The outline thickness of the sprite.
+            /// </summary>
+            public float OutlineThickness { get; set; }
             /// <summary>
             /// How the position will be calculated.
             /// </summary>
@@ -801,9 +926,33 @@ namespace WGP.SFDynamicObject
             /// </summary>
             public float OpacityFctCoeff { get; set; }
             /// <summary>
-            /// How the position will be calculated.
+            /// How the opacity will be calculated.
             /// </summary>
             public Fct OpacityFunction { get; set; }
+            /// <summary>
+            /// Coefficient of the color function.
+            /// </summary>
+            public float ColorFctCoeff { get; set; }
+            /// <summary>
+            /// How the color will be calculated.
+            /// </summary>
+            public Fct ColorFunction { get; set; }
+            /// <summary>
+            /// Coefficient of the outline color function.
+            /// </summary>
+            public float OutlineColorFctCoeff { get; set; }
+            /// <summary>
+            /// How the outline color will be calculated.
+            /// </summary>
+            public Fct OutlineColorFunction { get; set; }
+            /// <summary>
+            /// Coefficient of the outline thickness function.
+            /// </summary>
+            public float OutlineThicknessFctCoeff { get; set; }
+            /// <summary>
+            /// How the outline thickness will be calculated.
+            /// </summary>
+            public Fct OutlineThicknessFunction { get; set; }
             /// <summary>
             /// The transformations to add (or multiply in the case of scaling) to the bone.
             /// </summary>
@@ -828,6 +977,9 @@ namespace WGP.SFDynamicObject
             /// </summary>
             public Key()
             {
+                OutlineColor = Color.White;
+                OutlineThickness = 0;
+                Color = Color.White;
                 Transform = new Transformable();
                 PosFunction = Fct.LINEAR;
                 PosFctCoeff = 1;
@@ -839,6 +991,12 @@ namespace WGP.SFDynamicObject
                 RotFctCoeff = 1;
                 OpacityFunction = Fct.LINEAR;
                 OpacityFctCoeff = 1;
+                ColorFunction = Fct.LINEAR;
+                ColorFctCoeff = 1;
+                OutlineColorFunction = Fct.LINEAR;
+                OutlineColorFctCoeff = 1;
+                OutlineThicknessFunction = Fct.LINEAR;
+                OutlineThicknessFctCoeff = 1;
                 Opacity = 255;
             }
         }
@@ -863,15 +1021,50 @@ namespace WGP.SFDynamicObject
             Bones = new List<Couple<string, List<Key>>>();
         }
     }
+    public enum BlendModeType
+    {
+        /// <summary>
+        /// Default blendmode.
+        /// </summary>
+        BLEND_ALPHA,
+        /// <summary>
+        /// Additive blendmode.
+        /// </summary>
+        BLEND_ADD,
+        /// <summary>
+        /// Multiplicative blendmode.
+        /// </summary>
+        BLEND_MULT,
+        /// <summary>
+        /// Substractive blendmode.
+        /// </summary>
+        BLEND_SUB
+    }
     /// <summary>
     /// A basic bone.
     /// </summary>
     public class Bone : Transformable
     {
         /// <summary>
+        /// BlendMode used to draw this bone.
+        /// </summary>
+        public BlendModeType BlendMode { get; set; }
+        /// <summary>
         /// Opacity of the bone. Can only be changed using keys and animations.
         /// </summary>
         public byte Opacity { get; internal set; }
+        /// <summary>
+        /// Color of the bone. Can only be changed using keys and animations.
+        /// </summary>
+        public Color Color { get; internal set; }
+        /// <summary>
+        /// OutlineColor of the bone. Can only be changed using keys and animations.
+        /// </summary>
+        public Color OutlineColor { get; internal set; }
+        /// <summary>
+        /// Outline thickness of the bone. Can only be changed using keys and animations.
+        /// </summary>
+        public float OutlineThickness { get; internal set; }
         /// <summary>
         /// This bone should draw its temporary sprites before its attached sprites ?
         /// </summary>
@@ -907,6 +1100,10 @@ namespace WGP.SFDynamicObject
             AttachedSprites = new List<Couple<string, RectangleShape>>();
             Name = null;
             Opacity = 255;
+            Color = Color.White;
+            OutlineColor = Color.White;
+            OutlineThickness = 0;
+            BlendMode = BlendModeType.BLEND_ALPHA;
         }
     }
 }
