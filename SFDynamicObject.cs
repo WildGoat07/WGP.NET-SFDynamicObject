@@ -17,7 +17,7 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// Version of the current SFDynamicObject encoder/decoder.
         /// </summary>
-        public static readonly Version CurrentVersion = new Version(1, 1, 0, 0);
+        public static readonly Version CurrentVersion = new Version(1, 1, 0, 1);
         /// <summary>
         /// Version of the created object.
         /// </summary>
