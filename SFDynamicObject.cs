@@ -738,7 +738,7 @@ namespace WGP.SFDynamicObject
             try
             {
                 FormatJSON result = new FormatJSON();
-                result.Version = CurrentVersion;
+                result.Version = (Version)CurrentVersion.Clone();
 
                 if (BonesHierarchy == null)
                     result.Hierarchy = null;
