@@ -34,7 +34,7 @@ namespace WGP.SFDynamicObject
     }
     internal class FormatJSON
     {
-        public Version Version = new Version(1, 0);
+        public string Version = "1.0.0.0";
         public BoneJSON[] Hierarchy;
         public string[] Masters;
         public AnimationJSON[] Animations;

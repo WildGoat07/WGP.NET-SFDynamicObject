@@ -17,7 +17,7 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// Version of the current SFDynamicObject encoder/decoder.
         /// </summary>
-        public static readonly Version CurrentVersion = new Version(1, 1, 0, 1);
+        public static readonly Version CurrentVersion = new Version(1, 2, 0, 0);
         /// <summary>
         /// Version of the created object.
         /// </summary>
@@ -572,9 +572,9 @@ namespace WGP.SFDynamicObject
                     deser.MissingMemberHandling = Newtonsoft.Json.MissingMemberHandling.Ignore;
                     input = deser.Deserialize<FormatJSON>(new Newtonsoft.Json.JsonTextReader(sr));
                 }
-                Version = input.Version;
-                if (input.Version > CurrentVersion && !parseNewerVersions)
-                    throw new NewerVersionException(input.Version);
+                Version = new Version(input.Version);
+                if (Version > CurrentVersion && !parseNewerVersions)
+                    throw new NewerVersionException(Version);
                 if (input.Hierarchy != null)
                 {
                     foreach (var item in input.Hierarchy)
@@ -738,8 +738,7 @@ namespace WGP.SFDynamicObject
             try
             {
                 FormatJSON result = new FormatJSON();
-                result.Version = (Version)CurrentVersion.Clone();
-
+                result.Version = CurrentVersion.ToString();
                 if (BonesHierarchy == null)
                     result.Hierarchy = null;
                 else
