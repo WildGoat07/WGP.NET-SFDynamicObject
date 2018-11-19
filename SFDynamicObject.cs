@@ -14,6 +14,7 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class SFDynamicObject : Transformable, Drawable
     {
+        public IList<Resource> UsedResources { get; set; }
         /// <summary>
         /// Version of the current SFDynamicObject encoder/decoder.
         /// </summary>
@@ -45,18 +46,16 @@ namespace WGP.SFDynamicObject
                 bone.ComputedTransform = parent.ComputedTransform * final.Transform;
             else
                 bone.ComputedTransform = final.Transform;
-            if (bone.AttachedSprites != null)
+            if (bone.AttachedSprite != null)
             {
-                foreach (var sprite in bone.AttachedSprites)
-                {
-                    var c = bone.Color;
-                    c.A = bone.Opacity;
-                    var oc = bone.OutlineColor;
-                    oc.A = bone.Opacity;
-                    sprite.Value.FillColor = c;
-                    sprite.Value.OutlineColor = oc;
-                    sprite.Value.OutlineThickness = bone.OutlineThickness;
-                }
+                var sprite = bone.AttachedSprite;
+                var c = bone.Color;
+                c.A = bone.Opacity;
+                var oc = bone.OutlineColor;
+                oc.A = bone.Opacity;
+                sprite.Value.FillColor = c;
+                sprite.Value.OutlineColor = oc;
+                sprite.Value.OutlineThickness = bone.OutlineThickness;
             }
             if (bone.ChildBones != null)
             {
@@ -80,29 +79,27 @@ namespace WGP.SFDynamicObject
                         target.Draw(sprite, st);
                     }
                 }
-                if (bone.AttachedSprites != null)
+                if (bone.AttachedSprite != null)
                 {
-                    foreach (var sprite in bone.AttachedSprites)
+                    var sprite = bone.AttachedSprite;
+                    RenderStates st = new RenderStates(states);
+                    st.Transform *= bone.ComputedTransform;
+                    switch (bone.BlendMode)
                     {
-                        RenderStates st = new RenderStates(states);
-                        st.Transform *= bone.ComputedTransform;
-                        switch (bone.BlendMode)
-                        {
-                            case BlendModeType.BLEND_ALPHA:
-                                st.BlendMode = BlendMode.Alpha;
-                                break;
-                            case BlendModeType.BLEND_ADD:
-                                st.BlendMode = BlendMode.Add;
-                                break;
-                            case BlendModeType.BLEND_MULT:
-                                st.BlendMode = BlendMode.Multiply;
-                                break;
-                            case BlendModeType.BLEND_SUB:
-                                st.BlendMode = new BlendMode(BlendMode.Factor.OneMinusDstColor, BlendMode.Factor.OneMinusSrcColor);
-                                break;
-                        }
-                        target.Draw(sprite.Value, st);
+                        case BlendModeType.BLEND_ALPHA:
+                            st.BlendMode = BlendMode.Alpha;
+                            break;
+                        case BlendModeType.BLEND_ADD:
+                            st.BlendMode = BlendMode.Add;
+                            break;
+                        case BlendModeType.BLEND_MULT:
+                            st.BlendMode = BlendMode.Multiply;
+                            break;
+                        case BlendModeType.BLEND_SUB:
+                            st.BlendMode = new BlendMode(BlendMode.Factor.OneMinusDstColor, BlendMode.Factor.OneMinusSrcColor);
+                            break;
                     }
+                    target.Draw(sprite.Value, st);
                 }
                 if (!bone.DrawTempSpritesFirst && bone.TemporarySprites != null)
                 {
@@ -121,59 +118,21 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// The hierarchy of the bones. All bones must be here. The order in the hierarchy will be the order of drawing the sprites from the bones.
         /// </summary>
-        public List<Bone> BonesHierarchy { get; set; }
+        public IList<Bone> BonesHierarchy { get; set; }
         /// <summary>
         /// The list of the master bones. All child bones must NOT be referenced here.
         /// </summary>
-        public List<Bone> MasterBones { get; set; }
+        public IList<Bone> MasterBones { get; set; }
         /// <summary>
         /// Animations available for the bones.
         /// </summary>
-        public List<Animation> Animations { get; set; }
+        public IList<Animation> Animations { get; set; }
         /// <summary>
         /// Time between animations to smooth the transition.
         /// </summary>
         public Time TransitionTime { get; set; }
-        /// <summary>
-        /// Sets the ResourceManager used by the object. It should contain the necessary resources for the object.
-        /// </summary>
-        public ResourceManager Manager
-        {
-            get => _manager;
-            set
-            {
-                _manager = value;
-                if (_manager != null)
-                {
-                    foreach (var bone in BonesHierarchy)
-                    {
-                        foreach (var sprite in bone.AttachedSprites)
-                        {
-                            {
-                                if (sprite.Key != null)
-                                    if (Manager.ContainsKey(sprite.Key))
-                                    {
-                                        sprite.Value.Texture = (Texture)Manager[sprite.Key].Data;
-                                    }
-                                    else
-                                        sprite.Value.Texture = null;
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    foreach (var bone in BonesHierarchy)
-                    {
-                        foreach (var sprite in bone.AttachedSprites)
-                            sprite.Value.Texture = null;
-                    }
-                }
-            }
-        }
-        private ResourceManager _manager;
         private Animation currentAnim;
-        private Queue<string> buffer;
+        private Queue<Guid> buffer;
         private Chronometer chronometer;
 
         /// <summary>
@@ -184,10 +143,11 @@ namespace WGP.SFDynamicObject
             Version = CurrentVersion;
             oldAnimState = null;
             TransitionTime = Time.Zero;
-            buffer = new Queue<string>();
+            buffer = new Queue<Guid>();
             BonesHierarchy = new List<Bone>();
             MasterBones = new List<Bone>();
             Animations = new List<Animation>();
+            UsedResources = new List<Resource>();
             currentAnim = null;
             ResetAnimation();
         }
@@ -201,20 +161,17 @@ namespace WGP.SFDynamicObject
             foreach (var bone in BonesHierarchy)
             {
                 var tr = bone.ComputedTransform;
-                if (bone.AttachedSprites != null)
+                if (bone.AttachedSprite != null)
                 {
-                    foreach (var sprite in bone.AttachedSprites)
-                    {
-                        var rect = tr.TransformRect(sprite.Value.GetGlobalBounds());
-                        rect.Width += rect.Left;
-                        rect.Height += rect.Top;
+                    var sprite = bone.AttachedSprite;
+                    var rect = tr.TransformRect(sprite.Value.GetGlobalBounds());
+                    rect.Width += rect.Left;
+                    rect.Height += rect.Top;
 
-                        result.Left = Utilities.Min(result.Left, rect.Left);
-                        result.Top = Utilities.Min(result.Top, rect.Top);
-                        result.Width = Utilities.Max(result.Width, rect.Width);
-                        result.Height = Utilities.Max(result.Height, rect.Height);
-
-                    }
+                    result.Left = Utilities.Min(result.Left, rect.Left);
+                    result.Top = Utilities.Min(result.Top, rect.Top);
+                    result.Width = Utilities.Max(result.Width, rect.Width);
+                    result.Height = Utilities.Max(result.Height, rect.Height);
                 }
             }
             result.Width -= result.Left;
@@ -229,26 +186,26 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// Loads an animation. If a chronometer is set, it will reset.
         /// </summary>
-        /// <param name="animName">Name of the animation to load.</param>
+        /// <param name="animID">ID of the animation to load.</param>
         /// <param name="reset">Reset the chronometer.</param>
         /// <param name="queue">Queue containing the following animations to play once the current is finished.</param>
-        public void LoadAnimation(string animName, bool reset = true, params string[] queue)
+        public void LoadAnimation(Guid animID, bool reset = true, params Guid[] queue)
         {
             if (currentAnim != null)
                 oldAnimState = new Dictionary<Bone, Transformable>(transforms);
             if (Animations == null)
                 throw new Exception("No animations provided");
             if (queue != null)
-                buffer = new Queue<string>(queue);
+                buffer = new Queue<Guid>(queue);
             else
                 buffer.Clear();
-            if (animName == null)
+            if (animID == null)
                 currentAnim = null;
             else
             {
                 foreach (var item in Animations)
                 {
-                    if (item.Name == animName)
+                    if (item.ID == animID)
                     {
                         currentAnim = item;
                         transforms = new Dictionary<Bone, Transformable>();
@@ -272,7 +229,7 @@ namespace WGP.SFDynamicObject
                         return;
                     }
                 }
-                throw new Exception("No animation named \"" + animName + "\"");
+                throw new Exception("No animation named \"" + animID + "\"");
             }
         }
         /// <summary>
@@ -308,6 +265,10 @@ namespace WGP.SFDynamicObject
 
                 foreach (var bone in BonesHierarchy)
                 {
+                    if (bone.SpriteChrono == null)
+                        bone.SpriteChrono = new Chronometer(mainChrono);
+                    if (bone.AttachedSprite != null)
+                        bone.AttachedSprite.Update(bone.SpriteChrono.ElapsedTime);
                     bone.Opacity = 255;
                     bone.Color = Color.White;
                     bone.OutlineColor = Color.White;
@@ -473,17 +434,19 @@ namespace WGP.SFDynamicObject
             }
         }
         /// <summary>
-        /// Chronometer of the animation. Need to be set to animate.
+        /// Chronometer of the animation. Need to be set to animate. Create a relative chronometer internaly, so it should never change its time or speed to a lower value than 0. Also, it should be set once, at the begginning.
         /// </summary>
         public Chronometer Chronometer
         {
             private get => chronometer;
             set
             {
+                mainChrono = value;
                 chronometer = new Chronometer(value);
                 fadeChrono = new Chronometer(value);
             }
         }
+        private Chronometer mainChrono;
         /// <summary>
         /// The current time of the internal chronometer.
         /// </summary>
@@ -493,242 +456,9 @@ namespace WGP.SFDynamicObject
             set => chronometer.ElapsedTime = value;
         }
         /// <summary>
-        /// Loads an object from a file.
+        /// Saves the object to a stream as a template.
         /// </summary>
-        /// <param name="path">Path to the file.</param>
-        /// <param name="parseNewerVersions">Does the object try to parse newer versions ?</param>
-        public void LoadFromFile(string path, bool parseNewerVersions = false)
-        {
-            var stream = new System.IO.FileStream(path, System.IO.FileMode.Open, System.IO.FileAccess.Read);
-            try
-            {
-                LoadFromStream(stream, parseNewerVersions);
-            }
-            catch (Exception e)
-            {
-                stream.Close();
-                throw new Exception("Unable to load from the file", e);
-            }
-            stream.Close();
-        }
-        internal Bone OperateBone(BoneJSON bone)
-        {
-            Bone result = new Bone();
-            result.Name = bone.Name;
-            OperateTransform(result, bone.Transform);
-            if (bone.Sprites == null)
-                result.AttachedSprites = null;
-            else
-            {
-                result.AttachedSprites = new List<Couple<string, RectangleShape>>();
-                foreach (var item in bone.Sprites)
-                {
-                    RectangleShape tmp2 = new RectangleShape()
-                    {
-                        Size = item.Size,
-                        OutlineColor = item.OutlineColor,
-                        OutlineThickness = item.OutlineThickness,
-                        TextureRect = item.TextureRect
-                    };
-                    OperateTransform(tmp2, item.Transform);
-                    Couple<string, RectangleShape> tmp = new Couple<string, RectangleShape>(item.TextureID, tmp2);
-                    result.AttachedSprites.Add(tmp);
-                }
-            }
-            return result;
-        }
-        internal void OperateTransform(Transformable tr, TransformJSON trjson)
-        {
-            tr.Position = trjson.Position;
-            tr.Origin = trjson.Origin;
-            tr.Scale = trjson.Scale;
-            tr.Rotation = trjson.Rotation;
-        }
-        /// <summary>
-        /// Reload the manager. If one of his texture which is used in this object has been changed, it will take effect.
-        /// </summary>
-        public void ReloadManager() => Manager = Manager;
-        /// <summary>
-        /// Loads an object from a stream.
-        /// </summary>
-        /// <param name="stream">Stream.</param>
-        /// <param name="parseNewerVersions">Does the object try to parse newer versions ?</param>
-        public void LoadFromStream(System.IO.Stream stream, bool parseNewerVersions = false)
-        {
-            const string WrongFile = "Wrong data type or corrupted data";
-            if (stream == null)
-                throw new ArgumentNullException("stream");
-            if (!stream.CanRead)
-                throw new Exception("Can't read from the stream");
-            BonesHierarchy.Clear();
-            MasterBones.Clear();
-            Animations.Clear();
-            try
-            {
-                FormatJSON input;
-                {
-                    var sr = new System.IO.StreamReader(stream, Encoding.Unicode);
-                    var deser = new Newtonsoft.Json.JsonSerializer();
-                    deser.MissingMemberHandling = Newtonsoft.Json.MissingMemberHandling.Ignore;
-                    input = deser.Deserialize<FormatJSON>(new Newtonsoft.Json.JsonTextReader(sr));
-                }
-                Version = new Version(input.Version);
-                if (Version > CurrentVersion && !parseNewerVersions)
-                    throw new NewerVersionException(Version);
-                if (input.Hierarchy != null)
-                {
-                    foreach (var item in input.Hierarchy)
-                    {
-                        BonesHierarchy.Add(OperateBone(item));
-                    }
-                    foreach (var item in input.Hierarchy)
-                    {
-                        if (item.Children != null)
-                        {
-                            Bone bone = BonesHierarchy.Find((b) => b.Name == item.Name);
-                            bone.ChildBones = new List<Bone>();
-                            bone.BlendMode = item.BlendMode;
-                            foreach (var child in item.Children)
-                            {
-                                bone.ChildBones.Add(BonesHierarchy.Find((b) => b.Name == child));
-                            }
-                        }
-                    }
-                }
-                if (input.Masters != null)
-                {
-                    foreach (var item in input.Masters)
-                    {
-                        MasterBones.Add(BonesHierarchy.Find((b) => b.Name == item));
-                    }
-                }
-                if (input.Animations != null)
-                {
-                    foreach (var item1 in input.Animations)
-                    {
-                        Animation tmp1 = new Animation();
-                        tmp1.Name = item1.Name;
-                        tmp1.Duration = Time.FromMicroseconds(item1.Duration);
-                        tmp1.Bones = new List<Couple<string, List<Animation.Key>>>();
-                        if (item1.Bones != null)
-                        {
-                            foreach (var item2 in item1.Bones)
-                            {
-                                Couple<string, List<Animation.Key>> tmp2 = new Couple<string, List<Animation.Key>>();
-                                tmp2.Key = item2.BoneName;
-                                tmp2.Value = new List<Animation.Key>();
-                                if (item2.Keys != null)
-                                {
-                                    foreach (var item3 in item2.Keys)
-                                    {
-                                        Animation.Key tmp3 = new Animation.Key();
-                                        tmp3.Transform = new Transformable();
-                                        tmp3.Position = Time.FromMicroseconds(item3.Position);
-                                        OperateTransform(tmp3.Transform, item3.Transform);
-                                        tmp3.Opacity = item3.Opacity;
-                                        tmp3.Color = item3.Color;
-                                        tmp3.OutlineColor = item3.OutlineColor;
-                                        tmp3.OutlineThickness = item3.OutlineThickness;
-                                        tmp3.PosFctCoeff = item3.PosCoeff;
-                                        tmp3.PosFunction = (Animation.Key.Fct)item3.PosFunction;
-                                        tmp3.OriginFctCoeff = item3.OriCoeff;
-                                        tmp3.OriginFunction = (Animation.Key.Fct)item3.OriFunction;
-                                        tmp3.ScaleFctCoeff = item3.ScaCoeff;
-                                        tmp3.ScaleFunction = (Animation.Key.Fct)item3.ScaFunction;
-                                        tmp3.RotFctCoeff = item3.RotCoeff;
-                                        tmp3.RotFunction = (Animation.Key.Fct)item3.RotFunction;
-                                        tmp3.OpacityFctCoeff = item3.OpaCoeff;
-                                        tmp3.OpacityFunction = (Animation.Key.Fct)item3.OpaFunction;
-                                        tmp3.ColorFctCoeff = item3.ColCoeff;
-                                        tmp3.ColorFunction = (Animation.Key.Fct)item3.ColFunction;
-                                        tmp3.OutlineColorFctCoeff = item3.OCoCoeff;
-                                        tmp3.OutlineColorFunction = (Animation.Key.Fct)item3.OCoFunction;
-                                        tmp3.OutlineThicknessFctCoeff = item3.OThCoeff;
-                                        tmp3.OutlineThicknessFunction = (Animation.Key.Fct)item3.OThFunction;
-                                        tmp2.Value.Add(tmp3);
-                                    }
-                                }
-                                tmp1.Bones.Add(tmp2);
-                            }
-                        }
-                        Animations.Add(tmp1);
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                throw new Exception(WrongFile, e);
-            }
-        }
-        /// <summary>
-        /// Loads an object from the memory.
-        /// </summary>
-        /// <param name="buffer">bytes in the memory.</param>
-        /// <param name="parseNewerVersions">Does the object try to parse newer versions ?</param>
-        public void LoadFromMemory(byte[] buffer, bool parseNewerVersions = false)
-        {
-            var stream = new System.IO.MemoryStream(buffer, parseNewerVersions);
-            try
-            {
-                LoadFromStream(stream);
-            }
-            catch (Exception e)
-            {
-                stream.Close();
-                throw new Exception("Unable to load from the memory", e);
-            }
-        }
-        internal BoneJSON OperateBone(Bone bone)
-        {
-            BoneJSON result = new BoneJSON();
-            result.Name = bone.Name;
-            result.Transform = OperateTransform(bone);
-            result.BlendMode = bone.BlendMode;
-            if (bone.AttachedSprites == null)
-                result.Sprites = null;
-            else
-            {
-                var l = new List<SpriteJSON>();
-                foreach (var item in bone.AttachedSprites)
-                {
-                    SpriteJSON tmp1 = new SpriteJSON();
-                    tmp1.OutlineColor = item.Value.FillColor;
-                    tmp1.OutlineThickness = item.Value.OutlineThickness;
-                    tmp1.Size = item.Value.Size;
-                    tmp1.TextureID = item.Key;
-                    tmp1.TextureRect = item.Value.TextureRect;
-                    tmp1.Transform = OperateTransform(item.Value);
-                    l.Add(tmp1);
-                }
-                result.Sprites = l.ToArray();
-            }
-            if (bone.ChildBones == null)
-                result.Children = null;
-            else
-            {
-                var l = new List<string>();
-                foreach (var item in bone.ChildBones)
-                {
-                    l.Add(item.Name);
-                }
-                result.Children = l.ToArray();
-            }
-            return result;
-        }
-        internal TransformJSON OperateTransform(Transformable tr)
-        {
-            return new TransformJSON
-            {
-                Position = tr.Position,
-                Scale = tr.Scale,
-                Origin = tr.Origin,
-                Rotation = tr.Rotation
-            };
-        }
-        /// <summary>
-        /// Saves the object to a stream.
-        /// </summary>
-        /// <param name="stream"></param>
+        /// <param name="stream">Stream on which to save</param>
         public void SaveToStream(System.IO.Stream stream)
         {
             if (stream == null)
@@ -737,96 +467,9 @@ namespace WGP.SFDynamicObject
                 throw new Exception("Can't write in the stream");
             try
             {
-                FormatJSON result = new FormatJSON();
+                FormatData result = new FormatData();
                 result.Version = CurrentVersion.ToString();
-                if (BonesHierarchy == null)
-                    result.Hierarchy = null;
-                else
-                {
-                    var l = new List<BoneJSON>();
-                    foreach (var item in BonesHierarchy)
-                    {
-                        l.Add(OperateBone(item));
-                    }
-                    result.Hierarchy = l.ToArray();
-                }
-                if (MasterBones == null)
-                    result.Masters = null;
-                else
-                {
-                    var l = new List<string>();
-                    foreach (var item in MasterBones)
-                    {
-                        l.Add(item.Name);
-                    }
-                    result.Masters = l.ToArray();
-                }
-                if (Animations == null)
-                    result.Animations = null;
-                else
-                {
-                    var l = new List<AnimationJSON>();
-                    foreach (var item in Animations)
-                    {
-                        AnimationJSON tmp1 = new AnimationJSON();
-                        tmp1.Name = item.Name;
-                        tmp1.Duration = item.Duration.AsMicroseconds();
-                        if (item.Bones == null)
-                            tmp1.Bones = null;
-                        else
-                        {
-                            var l2 = new List<AnimatedBoneJSON>();
-                            foreach (var item2 in item.Bones)
-                            {
-                                AnimatedBoneJSON tmp2 = new AnimatedBoneJSON();
-                                tmp2.BoneName = item2.Key;
-                                if (item2.Value == null)
-                                    tmp2.Keys = null;
-                                else
-                                {
-                                    var l3 = new List<KeyJSON>();
-                                    foreach (var item3 in item2.Value)
-                                    {
-                                        KeyJSON tmp3 = new KeyJSON();
-                                        tmp3.Position = item3.Position.AsMicroseconds();
-                                        tmp3.Transform = OperateTransform(item3.Transform);
-                                        tmp3.PosCoeff = item3.PosFctCoeff;
-                                        tmp3.PosFunction = (int)item3.PosFunction;
-                                        tmp3.OriCoeff = item3.OriginFctCoeff;
-                                        tmp3.OriFunction = (int)item3.OriginFunction;
-                                        tmp3.ScaCoeff = item3.ScaleFctCoeff;
-                                        tmp3.ScaFunction = (int)item3.ScaleFunction;
-                                        tmp3.RotCoeff = item3.RotFctCoeff;
-                                        tmp3.RotFunction = (int)item3.RotFunction;
-                                        tmp3.OpaCoeff = item3.OpacityFctCoeff;
-                                        tmp3.OpaFunction = (int)item3.OpacityFunction;
-                                        tmp3.Opacity = item3.Opacity;
-                                        tmp3.ColCoeff = item3.ColorFctCoeff;
-                                        tmp3.ColFunction = (int)item3.ColorFunction;
-                                        tmp3.Color = item3.Color;
-                                        tmp3.OCoCoeff = item3.OutlineColorFctCoeff;
-                                        tmp3.OCoFunction = (int)item3.OutlineColorFunction;
-                                        tmp3.OutlineColor = item3.OutlineColor;
-                                        tmp3.OThCoeff = item3.OutlineThicknessFctCoeff;
-                                        tmp3.OThFunction = (int)item3.OutlineThicknessFunction;
-                                        tmp3.OutlineThickness = item3.OutlineThickness;
-                                        l3.Add(tmp3);
-                                    }
-                                    tmp2.Keys = l3.ToArray();
-                                }
-                                l2.Add(tmp2);
-                            }
-                            tmp1.Bones = l2.ToArray();
-                        }
-                        l.Add(tmp1);
-                    }
-                    result.Animations = l.ToArray();
-                }
-                var serial = new Newtonsoft.Json.JsonSerializer();
-                serial.Formatting = Newtonsoft.Json.Formatting.Indented;
-                var sw = new System.IO.StreamWriter(stream, Encoding.Unicode);
-                serial.Serialize(sw, result);
-                sw.Flush();
+#warning à compléter
             }
             catch (Exception e)
             {
@@ -859,6 +502,10 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class Animation
     {
+        /// <summary>
+        /// Universal identifier of the animation.
+        /// </summary>
+        public Guid ID { get; internal set; }
         /// <summary>
         /// A key. a key is a transformation at the right moment in the timeline. The dynamic object will make interpolations between the keys.
         /// </summary>
@@ -1044,6 +691,11 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class Bone : Transformable
     {
+        internal Chronometer SpriteChrono { get; set; }
+        /// <summary>
+        /// Universal identifier of the bone.
+        /// </summary>
+        public Guid ID { get; internal set; }
         /// <summary>
         /// BlendMode used to draw this bone.
         /// </summary>
@@ -1079,7 +731,7 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// The list of sprites affected by the changes of the bone. Be careful of the order (the order of drawing). The string is the name of the texture in the texture manager.
         /// </summary>
-        public List<Couple<string, RectangleShape>> AttachedSprites { get; set; }
+        public DynamicSprite AttachedSprite { get; set; }
         /// <summary>
         /// The temporary sprites are not saved but they are drawn at the same time as the bone. They are usually used for small details that change often in a game.
         /// </summary>
@@ -1093,16 +745,34 @@ namespace WGP.SFDynamicObject
         /// </summary>
         public Bone()
         {
+            SpriteChrono = null;
             DrawTempSpritesFirst = false;
             TemporarySprites = new List<Drawable>();
             ChildBones = new List<Bone>();
-            AttachedSprites = new List<Couple<string, RectangleShape>>();
+            AttachedSprite = new DynamicSprite();
             Name = null;
             Opacity = 255;
             Color = Color.White;
             OutlineColor = Color.White;
             OutlineThickness = 0;
             BlendMode = BlendModeType.BLEND_ALPHA;
+        }
+    }
+    public class DynamicSprite
+    {
+        public DynamicSprite()
+        {
+            InternalRect = null;
+            Resource = null;
+        }
+        public RectangleShape InternalRect { get; set; }
+        public Resource Resource { get; set; }
+        public void Update(Time timer)
+        {
+            if (InternalRect != null)
+                InternalRect.TextureRect = default;
+            if (InternalRect != null && Resource != null)
+                InternalRect.Texture = Resource.GetTexture(timer);
         }
     }
 }

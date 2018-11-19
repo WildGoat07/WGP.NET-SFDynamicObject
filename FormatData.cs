@@ -8,51 +8,59 @@ using SFML.System;
 
 namespace WGP.SFDynamicObject
 {
-    internal class TransformJSON
+    [Serializable]
+    internal class TransformData
     {
         public Vector2f Position;
         public Vector2f Scale;
         public Vector2f Origin;
         public float Rotation;
     }
-    internal class BoneJSON
+    [Serializable]
+    internal class BoneData
     {
         public BlendModeType BlendMode;
         public string Name;
-        public TransformJSON Transform;
-        public string[] Children;
-        public SpriteJSON[] Sprites;
+        public Guid ID;
+        public TransformData Transform;
+        public Guid[] Children;
+        public SpriteData Sprite;
     }
-    internal class SpriteJSON
+    [Serializable]
+    internal class SpriteData
     {
-        public string TextureID;
+        public Guid TextureID;
         public IntRect TextureRect;
         public Vector2f Size;
-        public TransformJSON Transform;
         public Color OutlineColor;
         public float OutlineThickness;
     }
-    internal class FormatJSON
+    [Serializable]
+    internal class FormatData
     {
-        public string Version = "1.0.0.0";
-        public BoneJSON[] Hierarchy;
-        public string[] Masters;
-        public AnimationJSON[] Animations;
+        public string Version;
+        public BoneData[] Hierarchy;
+        public Guid[] Masters;
+        public AnimationData[] Animations;
+        public Resource[] Resources;
     }
-    internal class AnimationJSON
+    [Serializable]
+    internal class AnimationData
     {
+        public Guid ID;
         public string Name;
-        public AnimatedBoneJSON[] Bones;
+        public AnimatedBoneData[] Bones;
         public long Duration;
     }
-    internal class KeyJSON
+    [Serializable]
+    internal class KeyData
     {
         public long Position;
-        public TransformJSON Transform;
-        public byte Opacity = 255;
-        public Color Color = Color.White;
-        public Color OutlineColor = Color.White;
-        public float OutlineThickness = 0;
+        public TransformData Transform;
+        public byte Opacity;
+        public Color Color;
+        public Color OutlineColor;
+        public float OutlineThickness;
         public int PosFunction;
         public float PosCoeff;
         public int OriFunction;
@@ -70,9 +78,10 @@ namespace WGP.SFDynamicObject
         public int OThFunction;
         public float OThCoeff;
     }
-    internal class AnimatedBoneJSON
+    [Serializable]
+    internal class AnimatedBoneData
     {
-        public string BoneName;
-        public KeyJSON[] Keys;
+        public Guid BoneID;
+        public KeyData[] Keys;
     }
 }
