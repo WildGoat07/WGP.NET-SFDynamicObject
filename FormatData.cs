@@ -21,17 +21,18 @@ namespace WGP.SFDynamicObject
     {
         public BlendModeType BlendMode;
         public string Name;
-        public Guid ID;
+        public byte[] ID;
         public TransformData Transform;
-        public Guid[] Children;
+        public byte[][] Children;
         public SpriteData Sprite;
     }
     [Serializable]
     internal class SpriteData
     {
-        public Guid TextureID;
+        public byte[] TextureID;
         public IntRect TextureRect;
         public Vector2f Size;
+        public Color Color;
         public Color OutlineColor;
         public float OutlineThickness;
     }
@@ -40,14 +41,14 @@ namespace WGP.SFDynamicObject
     {
         public string Version;
         public BoneData[] Hierarchy;
-        public Guid[] Masters;
+        public byte[][] Masters;
         public AnimationData[] Animations;
         public Resource[] Resources;
     }
     [Serializable]
     internal class AnimationData
     {
-        public Guid ID;
+        public byte[] ID;
         public string Name;
         public AnimatedBoneData[] Bones;
         public long Duration;
@@ -61,27 +62,27 @@ namespace WGP.SFDynamicObject
         public Color Color;
         public Color OutlineColor;
         public float OutlineThickness;
-        public int PosFunction;
+        public Animation.Key.Fct PosFunction;
         public float PosCoeff;
-        public int OriFunction;
+        public Animation.Key.Fct OriFunction;
         public float OriCoeff;
-        public int ScaFunction;
+        public Animation.Key.Fct ScaFunction;
         public float ScaCoeff;
-        public int RotFunction;
+        public Animation.Key.Fct RotFunction;
         public float RotCoeff;
-        public int OpaFunction;
+        public Animation.Key.Fct OpaFunction;
         public float OpaCoeff;
-        public int OCoFunction;
+        public Animation.Key.Fct OCoFunction;
         public float OCoCoeff;
-        public int ColFunction;
+        public Animation.Key.Fct ColFunction;
         public float ColCoeff;
-        public int OThFunction;
+        public Animation.Key.Fct OThFunction;
         public float OThCoeff;
     }
     [Serializable]
     internal class AnimatedBoneData
     {
-        public Guid BoneID;
+        public byte[] BoneID;
         public KeyData[] Keys;
     }
 }

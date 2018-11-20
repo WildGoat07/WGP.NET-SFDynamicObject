@@ -14,7 +14,8 @@ namespace WGP.SFDynamicObject
 
         public void LoadObjectTemplate(string name, Stream inputStream)
         {
-
+            var formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
+            templates.Add(name, (FormatData)formatter.Deserialize(inputStream));
         }
 
         public void RemoveObjectTemplate(string name)

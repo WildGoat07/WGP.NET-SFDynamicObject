@@ -13,7 +13,7 @@ namespace WGP.SFDynamicObject
     public class Resource : ISerializable
     {
         public string Name { get; set; }
-        public Guid ID { get; private set; }
+        public Guid ID { get; internal set; }
         private bool _repeated;
         public bool Repeated
         {
@@ -112,11 +112,7 @@ namespace WGP.SFDynamicObject
                 && FramesPosition != null
                 && FramesPosition.Length > 0)
             {
-                var list = new List<Texture>();
-                foreach (var item in FramesPosition)
-                {
-                    list.Add(new Texture(BaseImage, new IntRect(item, FrameSize)) { Smooth = Smooth, Repeated = Repeated });
-                }
+                textures = FramesPosition.Select((pos) => new Texture(BaseImage, new IntRect(pos, FrameSize)) { Smooth = Smooth, Repeated = Repeated }).ToArray();
             }
         }
 
@@ -138,19 +134,9 @@ namespace WGP.SFDynamicObject
             Repeated = info.GetBoolean("Repeated");
             Smooth = info.GetBoolean("Smooth");
             {
-                Vector2u size = (Vector2u)info.GetValue("Size", typeof(Vector2u));
-                if (size != default)
-                {
-                    BaseImage = new Image(size.X, size.Y);
-                    var pixels = (Color[])info.GetValue("Pixels", typeof(Color[]));
-                    for (uint y = 0; y < size.Y; y++)
-                    {
-                        for (uint x = 0; x < size.X; x++)
-                        {
-                            BaseImage.SetPixel(x, y, pixels[x + y * size.X]);
-                        }
-                    }
-                }
+                var bitmap = (System.Drawing.Bitmap)info.GetValue("Image", typeof(System.Drawing.Bitmap));
+                if (bitmap != null)
+                    BaseImage = new Image(bitmap);
                 FramesPerSecond = info.GetInt32("FramesPerSecond");
                 FrameSize = (Vector2i)info.GetValue("FrameSize", typeof(Vector2i));
                 FramesPosition = (Vector2i[])info.GetValue("FramesPosition", typeof(Vector2i[]));
@@ -165,22 +151,10 @@ namespace WGP.SFDynamicObject
             info.AddValue("Smooth", Smooth);
             if (BaseImage != null)
             {
-                info.AddValue("Size", BaseImage.Size);
-                List<Color> pixels = new List<Color>();
-                for (uint y = 0; y < BaseImage.Size.Y; y++)
-                {
-                    for (uint x = 0; x < BaseImage.Size.X; x++)
-                    {
-                        pixels.Add(BaseImage.GetPixel(x, y));
-                    }
-                }
-                info.AddValue("Pixels", pixels.ToArray());
+                info.AddValue("Image", (System.Drawing.Bitmap)BaseImage);
             }
             else
-            {
-                info.AddValue("Size", default(Vector2u));
-                info.AddValue("Pixels", new Color[0]);
-            }
+                info.AddValue("Image", null);
             info.AddValue("FramesPerSecond", FramesPerSecond);
             info.AddValue("FrameSize", FrameSize);
             info.AddValue("FramesPosition", FramesPosition);

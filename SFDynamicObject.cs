@@ -53,13 +53,13 @@ namespace WGP.SFDynamicObject
                 c.A = bone.Opacity;
                 var oc = bone.OutlineColor;
                 oc.A = bone.Opacity;
-                sprite.Value.FillColor = c;
-                sprite.Value.OutlineColor = oc;
-                sprite.Value.OutlineThickness = bone.OutlineThickness;
+                sprite.InternalRect.FillColor = c;
+                sprite.InternalRect.OutlineColor = oc;
+                sprite.InternalRect.OutlineThickness = bone.OutlineThickness;
             }
-            if (bone.ChildBones != null)
+            if (bone.Children != null)
             {
-                foreach (var child in bone.ChildBones)
+                foreach (var child in bone.Children)
                 {
                     ComputeBone(child, bone);
                 }
@@ -99,7 +99,7 @@ namespace WGP.SFDynamicObject
                             st.BlendMode = new BlendMode(BlendMode.Factor.OneMinusDstColor, BlendMode.Factor.OneMinusSrcColor);
                             break;
                     }
-                    target.Draw(sprite.Value, st);
+                    target.Draw(sprite.InternalRect, st);
                 }
                 if (!bone.DrawTempSpritesFirst && bone.TemporarySprites != null)
                 {
@@ -164,7 +164,7 @@ namespace WGP.SFDynamicObject
                 if (bone.AttachedSprite != null)
                 {
                     var sprite = bone.AttachedSprite;
-                    var rect = tr.TransformRect(sprite.Value.GetGlobalBounds());
+                    var rect = tr.TransformRect(sprite.InternalRect.GetGlobalBounds());
                     rect.Width += rect.Left;
                     rect.Height += rect.Top;
 
@@ -273,9 +273,9 @@ namespace WGP.SFDynamicObject
                     bone.Color = Color.White;
                     bone.OutlineColor = Color.White;
                     bone.OutlineThickness = 0;
-                    if (currentAnim.Bones != null && currentAnim.Bones.Contains(new Couple<string, List<Animation.Key>>() { Key = bone.Name }))
+                    if (currentAnim.Bones != null && currentAnim.Bones.Contains(new Couple<Guid, List<Animation.Key>>() { Key = bone.ID }))
                     {
-                        if (currentAnim.Bones.First((b) => b.Key == bone.Name).Value != null && currentAnim.Bones.First((b) => b.Key == bone.Name).Value.Count() == 0)
+                        if (currentAnim.Bones.First((b) => b.Key == bone.ID).Value != null && currentAnim.Bones.First((b) => b.Key == bone.ID).Value.Count() == 0)
                         {
                             transforms[bone] = new Transformable();
                             continue;
@@ -283,7 +283,7 @@ namespace WGP.SFDynamicObject
                         List<Animation.Key> states = null;
                         try
                         {
-                            var tmp = currentAnim.Bones.First((b) => b.Key == bone.Name);
+                            var tmp = currentAnim.Bones.First((b) => b.Key == bone.ID);
                             if (tmp == null)
                                 throw new KeyNotFoundException();
                             states = tmp.Value;
@@ -456,10 +456,10 @@ namespace WGP.SFDynamicObject
             set => chronometer.ElapsedTime = value;
         }
         /// <summary>
-        /// Saves the object to a stream as a template.
+        /// Saves the object to a stream as a template. This template can then be loaded by the DynamicObjectBuilder to create copies of it.
         /// </summary>
         /// <param name="stream">Stream on which to save</param>
-        public void SaveToStream(System.IO.Stream stream)
+        public void SaveAsTemplate(System.IO.Stream stream)
         {
             if (stream == null)
                 throw new ArgumentNullException("stream");
@@ -469,7 +469,87 @@ namespace WGP.SFDynamicObject
             {
                 FormatData result = new FormatData();
                 result.Version = CurrentVersion.ToString();
-#warning à compléter
+                result.Hierarchy = BonesHierarchy.Select((bone) =>
+                {
+                    var tmp = new BoneData();
+                    tmp.BlendMode = bone.BlendMode;
+                    tmp.Name = bone.Name;
+                    tmp.ID = bone.ID.ToByteArray();
+                    tmp.Transform = new TransformData();
+                    tmp.Transform.Position = bone.Position;
+                    tmp.Transform.Scale = bone.Scale;
+                    tmp.Transform.Origin = bone.Origin;
+                    tmp.Transform.Rotation = bone.Rotation;
+                    tmp.Children = bone.Children.Select((b) => b.ID.ToByteArray()).ToArray();
+                    tmp.Sprite = new SpriteData();
+                    if (bone.AttachedSprite != null)
+                    {
+                        if (bone.AttachedSprite.Resource != null)
+                            tmp.Sprite.TextureID = bone.AttachedSprite.Resource.ID.ToByteArray();
+                        else
+                            tmp.Sprite.TextureID = null;
+                        tmp.Sprite.TextureRect = bone.AttachedSprite.InternalRect.TextureRect;
+                        tmp.Sprite.Size = bone.AttachedSprite.InternalRect.Size;
+                        tmp.Sprite.Color = bone.AttachedSprite.InternalRect.FillColor;
+                        tmp.Sprite.OutlineColor = bone.AttachedSprite.InternalRect.OutlineColor;
+                        tmp.Sprite.OutlineThickness = bone.AttachedSprite.InternalRect.OutlineThickness;
+                    }
+                    else
+                        tmp.Sprite = null;
+                    return tmp;
+                }).ToArray();
+                result.Masters = MasterBones.Select((bone) => bone.ID.ToByteArray()).ToArray();
+                result.Animations = Animations.Select((anim) =>
+                {
+                    var tmp = new AnimationData();
+                    tmp.ID = anim.ID.ToByteArray();
+                    tmp.Name = anim.Name;
+                    tmp.Bones = anim.Bones.Select((bone) =>
+                    {
+                        var tmp2 = new AnimatedBoneData();
+                        tmp2.BoneID = bone.Key.ToByteArray();
+                        tmp2.Keys = bone.Value.Select((key) =>
+                        {
+                            var tmp3 = new KeyData();
+                            tmp3.Position = key.Position.Microseconds;
+                            tmp3.Transform = new TransformData();
+                            tmp3.Transform.Position = key.Transform.Position;
+                            tmp3.Transform.Scale = key.Transform.Scale;
+                            tmp3.Transform.Origin = key.Transform.Origin;
+                            tmp3.Transform.Rotation = key.Transform.Rotation;
+                            tmp3.Opacity = key.Opacity;
+                            tmp3.Color = key.Color;
+                            tmp3.OutlineColor = key.OutlineColor;
+                            tmp3.OutlineThickness = key.OutlineThickness;
+                            tmp3.PosFunction = key.PosFunction;
+                            tmp3.PosCoeff = key.PosFctCoeff;
+                            tmp3.OriFunction = key.OriginFunction;
+                            tmp3.OriCoeff = key.OriginFctCoeff;
+                            tmp3.ScaFunction = key.ScaleFunction;
+                            tmp3.ScaCoeff = key.ScaleFctCoeff;
+                            tmp3.RotFunction = key.RotFunction;
+                            tmp3.RotCoeff = key.RotFctCoeff;
+                            tmp3.OpaFunction = key.OpacityFunction;
+                            tmp3.OpaCoeff = key.OpacityFctCoeff;
+                            tmp3.OCoFunction = key.OutlineColorFunction;
+                            tmp3.OCoCoeff = key.OutlineColorFctCoeff;
+                            tmp3.ColFunction = key.ColorFunction;
+                            tmp3.ColCoeff = key.ColorFctCoeff;
+                            tmp3.OThFunction = key.OutlineThicknessFunction;
+                            tmp3.OThCoeff = key.OutlineThicknessFctCoeff;
+
+                            return tmp3;
+                        }).ToArray();
+
+                        return tmp2;
+                    }).ToArray();
+                    tmp.Duration = anim.Duration.Microseconds;
+
+                    return tmp;
+                }).ToArray();
+                result.Resources = UsedResources.ToArray();
+                var formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
+                formatter.Serialize(stream, result);
             }
             catch (Exception e)
             {
@@ -649,7 +729,7 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// A double array of all the keys of the animation, sorted by bones.
         /// </summary>
-        public List<Couple<string, List<Key>>> Bones { get; set; }
+        public List<Couple<Guid, List<Key>>> Bones { get; set; }
         /// <summary>
         /// The name of the animation. Needed when loading an animation.
         /// </summary>
@@ -664,7 +744,7 @@ namespace WGP.SFDynamicObject
         public Animation()
         {
             Name = null;
-            Bones = new List<Couple<string, List<Key>>>();
+            Bones = new List<Couple<Guid, List<Key>>>();
         }
     }
     public enum BlendModeType
@@ -723,7 +803,7 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// The childs of the bone. They will be relative to their parent.
         /// </summary>
-        public List<Bone> ChildBones { get; set; }
+        public List<Bone> Children { get; set; }
         /// <summary>
         /// The absolute transforms of the bone. For internal uses only.
         /// </summary>
@@ -745,10 +825,11 @@ namespace WGP.SFDynamicObject
         /// </summary>
         public Bone()
         {
+            ID = Guid.NewGuid();
             SpriteChrono = null;
             DrawTempSpritesFirst = false;
             TemporarySprites = new List<Drawable>();
-            ChildBones = new List<Bone>();
+            Children = new List<Bone>();
             AttachedSprite = new DynamicSprite();
             Name = null;
             Opacity = 255;
@@ -765,12 +846,17 @@ namespace WGP.SFDynamicObject
             InternalRect = null;
             Resource = null;
         }
+
+        public DynamicSprite(RectangleShape internalRect, Resource resource)
+        {
+            InternalRect = internalRect;
+            Resource = resource;
+        }
+
         public RectangleShape InternalRect { get; set; }
         public Resource Resource { get; set; }
         public void Update(Time timer)
         {
-            if (InternalRect != null)
-                InternalRect.TextureRect = default;
             if (InternalRect != null && Resource != null)
                 InternalRect.Texture = Resource.GetTexture(timer);
         }
