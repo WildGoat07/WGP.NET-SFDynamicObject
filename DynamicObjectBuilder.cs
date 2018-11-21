@@ -1,49 +1,32 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.IO;
+﻿using SFML.Graphics;
 using SFML.System;
-using SFML.Graphics;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace WGP.SFDynamicObject
 {
+    /// <summary>
+    /// Class used to load templates and creates them.
+    /// </summary>
     public class DynamicObjectBuilder
     {
-        private Dictionary<string, FormatData> templates;
         private List<Resource> resources;
-
+        private Dictionary<string, FormatData> templates;
+        /// <summary>
+        /// Constructor.
+        /// </summary>
         public DynamicObjectBuilder()
         {
             templates = new Dictionary<string, FormatData>();
             resources = new List<Resource>();
         }
-
-        public void LoadObjectTemplate(string name, Stream inputStream)
-        {
-            var formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
-            var tmp = (FormatData)formatter.Deserialize(inputStream);
-            resources.AddRange(tmp.Resources);
-            templates.Add(name, tmp);
-        }
-
-        public void RemoveObjectTemplate(string name)
-        {
-            try
-            {
-                var template = templates[name];
-                foreach (var item in template.Hierarchy)
-                {
-                    if (item.Sprite != null && item.Sprite.TextureID != null)
-                        resources.Remove(resources.Find((res) => res.ID == new Guid(item.Sprite.TextureID)));
-                }
-                templates.Remove(name);
-            }
-            catch (Exception)
-            { }
-        }
-
+        /// <summary>
+        /// Create an instance from a template.
+        /// </summary>
+        /// <param name="name">Template's name</param>
+        /// <returns>Dynamic object based by the template</returns>
         public SFDynamicObject CreateObject(string name)
         {
             FormatData copyFrom;
@@ -140,13 +123,43 @@ namespace WGP.SFDynamicObject
                 }));
                 result.UsedResources = copyFrom.Resources.ToList();
 
-
                 return result;
             }
             catch (Exception e)
             {
                 throw new Exception("An Error occurenced", e);
             }
+        }
+        /// <summary>
+        /// Adds a template to the builder's dictionnary.
+        /// </summary>
+        /// <param name="name">Template's name</param>
+        /// <param name="inputStream">Stream containing the template</param>
+        public void LoadObjectTemplate(string name, Stream inputStream)
+        {
+            var formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
+            var tmp = (FormatData)formatter.Deserialize(inputStream);
+            resources.AddRange(tmp.Resources);
+            templates.Add(name, tmp);
+        }
+        /// <summary>
+        /// Remove a template from the builder's dictionnary.
+        /// </summary>
+        /// <param name="name"></param>
+        public void RemoveObjectTemplate(string name)
+        {
+            try
+            {
+                var template = templates[name];
+                foreach (var item in template.Hierarchy)
+                {
+                    if (item.Sprite != null && item.Sprite.TextureID != null)
+                        resources.Remove(resources.Find((res) => res.ID == new Guid(item.Sprite.TextureID)));
+                }
+                templates.Remove(name);
+            }
+            catch (Exception)
+            { }
         }
     }
 }
