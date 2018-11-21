@@ -32,6 +32,12 @@ namespace WGP.SFDynamicObject
         {
             try
             {
+                var template = templates[name];
+                foreach (var item in template.Hierarchy)
+                {
+                    if (item.Sprite != null && item.Sprite.TextureID != null)
+                        resources.Remove(resources.Find((res) => res.ID == new Guid(item.Sprite.TextureID)));
+                }
                 templates.Remove(name);
             }
             catch (Exception)
@@ -40,9 +46,17 @@ namespace WGP.SFDynamicObject
 
         public SFDynamicObject CreateObject(string name)
         {
+            FormatData copyFrom;
             try
             {
-                var copyFrom = templates[name];
+                copyFrom = templates[name];
+            }
+            catch (Exception)
+            {
+                throw new Exception("No template named " + name + " found");
+            }
+            try
+            {
                 var result = new SFDynamicObject();
                 result.Version = new Version(copyFrom.Version);
                 result.BonesHierarchy.AddRange(copyFrom.Hierarchy.Select((bone) =>
@@ -55,16 +69,20 @@ namespace WGP.SFDynamicObject
                     tmp.Scale = bone.Transform.Scale;
                     tmp.Origin = bone.Transform.Origin;
                     tmp.Rotation = bone.Transform.Rotation;
-                    tmp.AttachedSprite = new DynamicSprite();
-                    tmp.AttachedSprite.InternalRect = new RectangleShape()
+                    if (bone.Sprite != null)
                     {
-                        TextureRect = bone.Sprite.TextureRect,
-                        Size = bone.Sprite.Size,
-                        FillColor = bone.Sprite.Color,
-                        OutlineColor = bone.Sprite.OutlineColor,
-                        OutlineThickness = bone.Sprite.OutlineThickness
-                    };
-                    tmp.AttachedSprite.Resource = resources.Find((res) => res.ID == new Guid(bone.Sprite.TextureID));
+                        tmp.AttachedSprite = new DynamicSprite();
+                        tmp.AttachedSprite.InternalRect = new RectangleShape()
+                        {
+                            TextureRect = bone.Sprite.TextureRect,
+                            Size = bone.Sprite.Size,
+                            FillColor = bone.Sprite.Color,
+                            OutlineColor = bone.Sprite.OutlineColor,
+                            OutlineThickness = bone.Sprite.OutlineThickness
+                        };
+                        if (bone.Sprite.TextureID != null)
+                            tmp.AttachedSprite.Resource = resources.Find((res) => res.ID == new Guid(bone.Sprite.TextureID));
+                    }
 
                     return tmp;
                 }));
@@ -114,16 +132,20 @@ namespace WGP.SFDynamicObject
 
                             return tmp3;
                         }));
+                        return new Couple<Bone, List<Animation.Key>>(selectedBone, tmp2);
                     }));
-                }));
+                    tmp1.Duration = Time.FromMicroseconds(anim.Duration);
 
+                    return tmp1;
+                }));
+                result.UsedResources = copyFrom.Resources.ToList();
 
 
                 return result;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
-                throw new Exception("No template named " + name + " found");
+                throw new Exception("An Error occurenced", e);
             }
         }
     }

@@ -14,6 +14,23 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class SFDynamicObject : Transformable, Drawable
     {
+        private class ResComparer : IEqualityComparer<Resource>
+        {
+            public bool Equals(Resource x, Resource y) => x.ID.Equals(y.ID);
+
+            public int GetHashCode(Resource obj) => obj.ID.GetHashCode();
+        }
+
+        public void CleanResources()
+        {
+            var newList = new List<Resource>();
+            foreach (var item in BonesHierarchy)
+            {
+                if (item.AttachedSprite != null && item.AttachedSprite.Resource != null && !newList.Contains(item.AttachedSprite.Resource, new ResComparer()))
+                    newList.Add(item.AttachedSprite.Resource);
+            }
+            UsedResources = newList;
+        }
         public List<Resource> UsedResources { get; set; }
         /// <summary>
         /// Version of the current SFDynamicObject encoder/decoder.
@@ -23,16 +40,6 @@ namespace WGP.SFDynamicObject
         /// Version of the created object.
         /// </summary>
         public Version Version { get; internal set; }
-        public class NewerVersionException : Exception
-        {
-            public Version CurrentVersion { get; }
-            public Version RequestedVersion { get; }
-            public NewerVersionException(Version FileVersion) : base("The file is in " + FileVersion + " but the API is in " + SFDynamicObject.CurrentVersion)
-            {
-                CurrentVersion = SFDynamicObject.CurrentVersion;
-                RequestedVersion = FileVersion;
-            }
-        }
 
         private void ComputeBone(Bone bone, Bone parent)
         {
@@ -186,6 +193,21 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// Loads an animation. If a chronometer is set, it will reset.
         /// </summary>
+        /// <param name="anim">The name of the animation to load.</param>
+        /// <param name="reset">Reset the chronometer.</param>
+        /// <param name="queue">Queue containing the following animations to play once the current is finished.</param>
+        public void LoadAnimation(string anim, bool reset = true, params string[] queue) => LoadAnimation(Animations.Find((a) => a.Name == anim), reset, queue.Select((n) => Animations.Find((a) => a.Name == n)).ToArray());
+        /// <summary>
+        /// Loads an animation. If a chronometer is set, it will reset.
+        /// </summary>
+        /// <param name="anim">The ID of the animation to load.</param>
+        /// <param name="reset">Reset the chronometer.</param>
+        /// <param name="queue">Queue containing the following animations to play once the current is finished.</param>
+        public void LoadAnimation(Guid anim, bool reset = true, params Guid[] queue) => LoadAnimation(Animations.Find((a) => a.ID == anim), reset, queue.Select((id) => Animations.Find((a) => a.ID == id)).ToArray());
+
+        /// <summary>
+        /// Loads an animation. If a chronometer is set, it will reset.
+        /// </summary>
         /// <param name="anim">The animation to load.</param>
         /// <param name="reset">Reset the chronometer.</param>
         /// <param name="queue">Queue containing the following animations to play once the current is finished.</param>
@@ -283,7 +305,7 @@ namespace WGP.SFDynamicObject
                                 throw new KeyNotFoundException();
                             states = tmp.Value;
                         }
-                        catch (KeyNotFoundException e)
+                        catch (KeyNotFoundException)
                         {
                             throw new Exception("No bone named \"" + bone.Name + "\" in  the animation \"" + currentAnim.Name + "\"");
                         }
@@ -825,7 +847,7 @@ namespace WGP.SFDynamicObject
             DrawTempSpritesFirst = false;
             TemporarySprites = new List<Drawable>();
             Children = new List<Bone>();
-            AttachedSprite = new DynamicSprite();
+            AttachedSprite = null;
             Name = null;
             Opacity = 255;
             Color = Color.White;
