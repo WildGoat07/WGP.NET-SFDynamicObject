@@ -37,6 +37,8 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class Animation
     {
+        #region Public Constructors
+
         /// <summary>
         /// Constructor.
         /// </summary>
@@ -45,6 +47,10 @@ namespace WGP.SFDynamicObject
             Name = null;
             Bones = new List<Couple<Bone, List<Key>>>();
         }
+
+        #endregion Public Constructors
+
+        #region Public Properties
 
         /// <summary>
         /// A double array of all the keys of the animation, sorted by bones.
@@ -66,11 +72,18 @@ namespace WGP.SFDynamicObject
         /// </summary>
         public string Name { get; set; }
 
+        #endregion Public Properties
+
+        #region Public Classes
+
         /// <summary>
-        /// A key. a key is a transformation at the right moment in the timeline. The dynamic object will make interpolations between the keys.
+        /// A key. a key is a transformation at the right moment in the timeline. The dynamic object
+        /// will make interpolations between the keys.
         /// </summary>
         public class Key : IComparable<Key>, IComparable
         {
+            #region Public Constructors
+
             /// <summary>
             /// Constructor.
             /// </summary>
@@ -99,6 +112,10 @@ namespace WGP.SFDynamicObject
                 Opacity = 255;
             }
 
+            #endregion Public Constructors
+
+            #region Public Enums
+
             /// <summary>
             /// Type of the interpolation function
             /// </summary>
@@ -110,6 +127,10 @@ namespace WGP.SFDynamicObject
                 GAUSS,
                 BINARY
             }
+
+            #endregion Public Enums
+
+            #region Public Properties
 
             /// <summary>
             /// The color of the sprite.
@@ -130,6 +151,7 @@ namespace WGP.SFDynamicObject
             /// The opacity of the bone. Doesn't inherit from its parent.
             /// </summary>
             public byte Opacity { get; set; }
+
             /// <summary>
             /// Coefficient of the opacity function.
             /// </summary>
@@ -184,10 +206,12 @@ namespace WGP.SFDynamicObject
             /// Coefficient of the position function.
             /// </summary>
             public float PosFctCoeff { get; set; }
+
             /// <summary>
             /// How the position will be calculated.
             /// </summary>
             public Fct PosFunction { get; set; }
+
             /// <summary>
             /// The position in time of the key in the timeline.
             /// </summary>
@@ -212,21 +236,32 @@ namespace WGP.SFDynamicObject
             /// How the scale will be calculated.
             /// </summary>
             public Fct ScaleFunction { get; set; }
+
             /// <summary>
             /// The transformations to add (or multiply in the case of scaling) to the bone.
             /// </summary>
             public Transformable Transform { get; set; }
+
+            #endregion Public Properties
+
+            #region Public Methods
+
             public int CompareTo(Key other)
             {
                 return Position.AsMicroseconds().CompareTo(other.Position.AsMicroseconds());
             }
+
             public int CompareTo(object obj)
             {
                 if (obj is Key)
                     return CompareTo((Key)obj);
                 throw new InvalidOperationException("Invalid type :" + obj.GetType());
             }
+
+            #endregion Public Methods
         }
+
+        #endregion Public Classes
     }
 
     /// <summary>
@@ -234,6 +269,8 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class Bone : Transformable, IEquatable<Bone>
     {
+        #region Public Constructors
+
         /// <summary>
         /// Constructor.
         /// </summary>
@@ -253,8 +290,13 @@ namespace WGP.SFDynamicObject
             BlendMode = BlendModeType.BLEND_ALPHA;
         }
 
+        #endregion Public Constructors
+
+        #region Public Properties
+
         /// <summary>
-        /// The list of sprites affected by the changes of the bone. Be careful of the order (the order of drawing). The string is the name of the texture in the texture manager.
+        /// The list of sprites affected by the changes of the bone. Be careful of the order (the
+        /// order of drawing). The string is the name of the texture in the texture manager.
         /// </summary>
         public DynamicSprite AttachedSprite { get; set; }
 
@@ -309,21 +351,34 @@ namespace WGP.SFDynamicObject
         public float OutlineThickness { get; internal set; }
 
         /// <summary>
-        /// The temporary sprites are not saved but they are drawn at the same time as the bone. They are usually used for small details that change often in a game.
+        /// The temporary sprites are not saved but they are drawn at the same time as the bone. They
+        /// are usually used for small details that change often in a game.
         /// </summary>
         public List<Drawable> TemporarySprites { get; set; }
 
+        #endregion Public Properties
+
+        #region Internal Properties
+
         internal Chronometer SpriteChrono { get; set; }
+
+        #endregion Internal Properties
+
+        #region Public Methods
 
         public bool Equals(Bone other) => ID.Equals(other.ID);
 
         public override bool Equals(object obj) => Equals((Bone)obj);
 
         public override int GetHashCode() => ID.GetHashCode();
+
+        #endregion Public Methods
     }
 
     public class Couple<T, U> : IEquatable<Couple<T, U>> where T : IEquatable<T>
     {
+        #region Public Constructors
+
         public Couple()
         {
         }
@@ -334,19 +389,32 @@ namespace WGP.SFDynamicObject
             Value = value;
         }
 
+        #endregion Public Constructors
+
+        #region Public Properties
+
         public T Key { get; set; }
         public U Value { get; set; }
+
+        #endregion Public Properties
+
+        #region Public Methods
 
         public bool Equals(Couple<T, U> other)
         {
             return Key.Equals(other.Key);
         }
+
+        #endregion Public Methods
     }
+
     /// <summary>
     /// The dynamic sprite is used to link a Resource to a RectangleShape.
     /// </summary>
     public class DynamicSprite
     {
+        #region Public Constructors
+
         /// <summary>
         /// Constructor.
         /// </summary>
@@ -355,6 +423,7 @@ namespace WGP.SFDynamicObject
             InternalRect = null;
             Resource = null;
         }
+
         /// <summary>
         /// Constructor.
         /// </summary>
@@ -365,14 +434,25 @@ namespace WGP.SFDynamicObject
             InternalRect = internalRect;
             Resource = resource;
         }
+
+        #endregion Public Constructors
+
+        #region Public Properties
+
         /// <summary>
         /// Rectangle of the sprite.
         /// </summary>
         public RectangleShape InternalRect { get; set; }
+
         /// <summary>
         /// Resource for the rectangle.
         /// </summary>
         public Resource Resource { get; set; }
+
+        #endregion Public Properties
+
+        #region Public Methods
+
         /// <summary>
         /// Updates the sprite to match its texture.
         /// </summary>
@@ -382,6 +462,8 @@ namespace WGP.SFDynamicObject
             if (InternalRect != null && Resource != null)
                 InternalRect.Texture = Resource.GetTexture(timer);
         }
+
+        #endregion Public Methods
     }
 
     /// <summary>
@@ -389,10 +471,16 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class SFDynamicObject : Transformable, Drawable
     {
+        #region Public Fields
+
         /// <summary>
         /// Version of the current SFDynamicObject encoder/decoder.
         /// </summary>
-        public static readonly Version CurrentVersion = new Version(1, 2, 0, 0);
+        public static readonly Version CurrentVersion = new Version(2, 0, 0, 0);
+
+        #endregion Public Fields
+
+        #region Private Fields
 
         private Queue<Animation> buffer;
 
@@ -407,6 +495,10 @@ namespace WGP.SFDynamicObject
         private Dictionary<Bone, Transformable> oldAnimState;
 
         private Dictionary<Bone, Transformable> transforms;
+
+        #endregion Private Fields
+
+        #region Public Constructors
 
         /// <summary>
         /// Constructor.
@@ -425,18 +517,25 @@ namespace WGP.SFDynamicObject
             ResetAnimation();
         }
 
+        #endregion Public Constructors
+
+        #region Public Properties
+
         /// <summary>
         /// Animations available for the bones.
         /// </summary>
         public List<Animation> Animations { get; set; }
 
         /// <summary>
-        /// The hierarchy of the bones. All bones must be here. The order in the hierarchy will be the order of drawing the sprites from the bones.
+        /// The hierarchy of the bones. All bones must be here. The order in the hierarchy will be
+        /// the order of drawing the sprites from the bones.
         /// </summary>
         public List<Bone> BonesHierarchy { get; set; }
 
         /// <summary>
-        /// Chronometer of the animation. Need to be set to animate. Create a relative chronometer internaly, so it should never change its time or speed to a lower value than 0. Also, it should be set once, at the begginning.
+        /// Chronometer of the animation. Need to be set to animate. Create a relative chronometer
+        /// internaly, so it should never change its time or speed to a lower value than 0. Also, it
+        /// should be set once, at the begginning.
         /// </summary>
         public Chronometer Chronometer
         {
@@ -467,8 +566,10 @@ namespace WGP.SFDynamicObject
         /// Time between animations to smooth the transition.
         /// </summary>
         public Time TransitionTime { get; set; }
+
         /// <summary>
-        /// Resources used by this object. Should contains ALL resources used. Unused ones can be added too, tho.
+        /// Resources used by this object. Should contains ALL resources used. Unused ones can be
+        /// added too, tho.
         /// </summary>
         public List<Resource> UsedResources { get; set; }
 
@@ -476,6 +577,11 @@ namespace WGP.SFDynamicObject
         /// Version of the created object.
         /// </summary>
         public Version Version { get; internal set; }
+
+        #endregion Public Properties
+
+        #region Public Methods
+
         /// <summary>
         /// Cleans the resources by removing all the unused ones.
         /// </summary>
@@ -580,7 +686,9 @@ namespace WGP.SFDynamicObject
         /// </summary>
         /// <param name="anim">The name of the animation to load.</param>
         /// <param name="reset">Reset the chronometer.</param>
-        /// <param name="queue">Queue containing the following animations to play once the current is finished.</param>
+        /// <param name="queue">
+        /// Queue containing the following animations to play once the current is finished.
+        /// </param>
         public void LoadAnimation(string anim, bool reset = true, params string[] queue) => LoadAnimation(Animations.Find((a) => a.Name == anim), reset, queue.Select((n) => Animations.Find((a) => a.Name == n)).ToArray());
 
         /// <summary>
@@ -588,7 +696,9 @@ namespace WGP.SFDynamicObject
         /// </summary>
         /// <param name="anim">The ID of the animation to load.</param>
         /// <param name="reset">Reset the chronometer.</param>
-        /// <param name="queue">Queue containing the following animations to play once the current is finished.</param>
+        /// <param name="queue">
+        /// Queue containing the following animations to play once the current is finished.
+        /// </param>
         public void LoadAnimation(Guid anim, bool reset = true, params Guid[] queue) => LoadAnimation(Animations.Find((a) => a.ID == anim), reset, queue.Select((id) => Animations.Find((a) => a.ID == id)).ToArray());
 
         /// <summary>
@@ -596,7 +706,9 @@ namespace WGP.SFDynamicObject
         /// </summary>
         /// <param name="anim">The animation to load.</param>
         /// <param name="reset">Reset the chronometer.</param>
-        /// <param name="queue">Queue containing the following animations to play once the current is finished.</param>
+        /// <param name="queue">
+        /// Queue containing the following animations to play once the current is finished.
+        /// </param>
         public void LoadAnimation(Animation anim, bool reset = true, params Animation[] queue)
         {
             if (currentAnim != null)
@@ -652,7 +764,8 @@ namespace WGP.SFDynamicObject
         }
 
         /// <summary>
-        /// Saves the object to a stream as a template. This template can then be loaded by the DynamicObjectBuilder to create copies of it.
+        /// Saves the object to a stream as a template. This template can then be loaded by the
+        /// DynamicObjectBuilder to create copies of it.
         /// </summary>
         /// <param name="stream">Stream on which to save</param>
         public void SaveAsTemplate(System.IO.Stream stream)
@@ -754,7 +867,8 @@ namespace WGP.SFDynamicObject
         }
 
         /// <summary>
-        /// Updates the display of the object by adjusting the bones to match the animations. Won't have any effect if there are no chronometer set or no animation loaded.
+        /// Updates the display of the object by adjusting the bones to match the animations. Won't
+        /// have any effect if there are no chronometer set or no animation loaded.
         /// </summary>
         public void Update()
         {
@@ -941,6 +1055,10 @@ namespace WGP.SFDynamicObject
             }
         }
 
+        #endregion Public Methods
+
+        #region Private Methods
+
         private void ComputeBone(Bone bone, Bone parent)
         {
             Transformable added = transforms[bone];
@@ -973,11 +1091,21 @@ namespace WGP.SFDynamicObject
             }
         }
 
+        #endregion Private Methods
+
+        #region Private Classes
+
         private class ResComparer : IEqualityComparer<Resource>
         {
+            #region Public Methods
+
             public bool Equals(Resource x, Resource y) => x.ID.Equals(y.ID);
 
             public int GetHashCode(Resource obj) => obj.ID.GetHashCode();
+
+            #endregion Public Methods
         }
+
+        #endregion Private Classes
     }
 }
