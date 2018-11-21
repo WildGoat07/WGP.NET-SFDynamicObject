@@ -299,7 +299,8 @@ namespace WGP.SFDynamicObject
         public void Dispose()
         {
             if (disposed) throw new ObjectDisposedException(typeof(Resource).ToString());
-            BaseImage.Dispose();
+            if (BaseImage != null)
+                BaseImage.Dispose();
             foreach (var item in textures)
                 item.Dispose();
             disposed = true;
