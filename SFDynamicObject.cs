@@ -14,7 +14,7 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class SFDynamicObject : Transformable, Drawable
     {
-        public IList<Resource> UsedResources { get; set; }
+        public List<Resource> UsedResources { get; set; }
         /// <summary>
         /// Version of the current SFDynamicObject encoder/decoder.
         /// </summary>
@@ -22,7 +22,7 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// Version of the created object.
         /// </summary>
-        public Version Version { get; private set; }
+        public Version Version { get; internal set; }
         public class NewerVersionException : Exception
         {
             public Version CurrentVersion { get; }
@@ -118,21 +118,21 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// The hierarchy of the bones. All bones must be here. The order in the hierarchy will be the order of drawing the sprites from the bones.
         /// </summary>
-        public IList<Bone> BonesHierarchy { get; set; }
+        public List<Bone> BonesHierarchy { get; set; }
         /// <summary>
         /// The list of the master bones. All child bones must NOT be referenced here.
         /// </summary>
-        public IList<Bone> MasterBones { get; set; }
+        public List<Bone> MasterBones { get; set; }
         /// <summary>
         /// Animations available for the bones.
         /// </summary>
-        public IList<Animation> Animations { get; set; }
+        public List<Animation> Animations { get; set; }
         /// <summary>
         /// Time between animations to smooth the transition.
         /// </summary>
         public Time TransitionTime { get; set; }
         private Animation currentAnim;
-        private Queue<Guid> buffer;
+        private Queue<Animation> buffer;
         private Chronometer chronometer;
 
         /// <summary>
@@ -143,7 +143,7 @@ namespace WGP.SFDynamicObject
             Version = CurrentVersion;
             oldAnimState = null;
             TransitionTime = Time.Zero;
-            buffer = new Queue<Guid>();
+            buffer = new Queue<Animation>();
             BonesHierarchy = new List<Bone>();
             MasterBones = new List<Bone>();
             Animations = new List<Animation>();
@@ -186,50 +186,44 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// Loads an animation. If a chronometer is set, it will reset.
         /// </summary>
-        /// <param name="animID">ID of the animation to load.</param>
+        /// <param name="anim">The animation to load.</param>
         /// <param name="reset">Reset the chronometer.</param>
         /// <param name="queue">Queue containing the following animations to play once the current is finished.</param>
-        public void LoadAnimation(Guid animID, bool reset = true, params Guid[] queue)
+        public void LoadAnimation(Animation anim, bool reset = true, params Animation[] queue)
         {
             if (currentAnim != null)
                 oldAnimState = new Dictionary<Bone, Transformable>(transforms);
             if (Animations == null)
                 throw new Exception("No animations provided");
             if (queue != null)
-                buffer = new Queue<Guid>(queue);
+                buffer = new Queue<Animation>(queue);
             else
                 buffer.Clear();
-            if (animID == null)
+            if (anim == null)
                 currentAnim = null;
             else
             {
-                foreach (var item in Animations)
+                currentAnim = anim;
+                transforms = new Dictionary<Bone, Transformable>();
+                if (currentAnim.Bones != null)
                 {
-                    if (item.ID == animID)
+                    foreach (var statList in currentAnim.Bones)
                     {
-                        currentAnim = item;
-                        transforms = new Dictionary<Bone, Transformable>();
-                        if (currentAnim.Bones != null)
+                        if (statList.Value != null)
                         {
-                            foreach (var statList in currentAnim.Bones)
-                            {
-                                if (statList.Value != null)
-                                {
-                                    statList.Value.Sort();
-                                }
-                            }
+                            statList.Value.Sort();
                         }
-                        foreach (var bone in BonesHierarchy)
-                            transforms.Add(bone, new Transformable());
-                        if (Chronometer != null && reset)
-                        {
-                            Chronometer.Restart();
-                            fadeChrono.Restart();
-                        }
-                        return;
                     }
                 }
-                throw new Exception("No animation named \"" + animID + "\"");
+                foreach (var bone in BonesHierarchy)
+                    transforms.Add(bone, new Transformable());
+                if (Chronometer != null && reset)
+                {
+                    Chronometer.Restart();
+                    fadeChrono.Restart();
+                }
+                return;
+                throw new Exception("No animation named \"" + anim + "\"");
             }
         }
         /// <summary>
@@ -258,7 +252,8 @@ namespace WGP.SFDynamicObject
                 {
                     if (buffer.Count > 0)
                         LoadAnimation(buffer.Dequeue());
-                    Chronometer.Restart();
+                    else
+                        Chronometer.Restart();
                 }
                 Time currentTime = Chronometer.ElapsedTime;
                 Time currentFadeTime = fadeChrono.ElapsedTime;
@@ -273,9 +268,9 @@ namespace WGP.SFDynamicObject
                     bone.Color = Color.White;
                     bone.OutlineColor = Color.White;
                     bone.OutlineThickness = 0;
-                    if (currentAnim.Bones != null && currentAnim.Bones.Contains(new Couple<Guid, List<Animation.Key>>() { Key = bone.ID }))
+                    if (currentAnim.Bones != null && currentAnim.Bones.Contains(new Couple<Bone, List<Animation.Key>>() { Key = bone }))
                     {
-                        if (currentAnim.Bones.First((b) => b.Key == bone.ID).Value != null && currentAnim.Bones.First((b) => b.Key == bone.ID).Value.Count() == 0)
+                        if (currentAnim.Bones.First((b) => b.Key == bone).Value != null && currentAnim.Bones.First((b) => b.Key == bone).Value.Count() == 0)
                         {
                             transforms[bone] = new Transformable();
                             continue;
@@ -283,7 +278,7 @@ namespace WGP.SFDynamicObject
                         List<Animation.Key> states = null;
                         try
                         {
-                            var tmp = currentAnim.Bones.First((b) => b.Key == bone.ID);
+                            var tmp = currentAnim.Bones.First((b) => b.Key.Equals(bone));
                             if (tmp == null)
                                 throw new KeyNotFoundException();
                             states = tmp.Value;
@@ -507,7 +502,7 @@ namespace WGP.SFDynamicObject
                     tmp.Bones = anim.Bones.Select((bone) =>
                     {
                         var tmp2 = new AnimatedBoneData();
-                        tmp2.BoneID = bone.Key.ToByteArray();
+                        tmp2.BoneID = bone.Key.ID.ToByteArray();
                         tmp2.Keys = bone.Value.Select((key) =>
                         {
                             var tmp3 = new KeyData();
@@ -729,7 +724,7 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// A double array of all the keys of the animation, sorted by bones.
         /// </summary>
-        public List<Couple<Guid, List<Key>>> Bones { get; set; }
+        public List<Couple<Bone, List<Key>>> Bones { get; set; }
         /// <summary>
         /// The name of the animation. Needed when loading an animation.
         /// </summary>
@@ -744,7 +739,7 @@ namespace WGP.SFDynamicObject
         public Animation()
         {
             Name = null;
-            Bones = new List<Couple<Guid, List<Key>>>();
+            Bones = new List<Couple<Bone, List<Key>>>();
         }
     }
     public enum BlendModeType
@@ -769,7 +764,7 @@ namespace WGP.SFDynamicObject
     /// <summary>
     /// A basic bone.
     /// </summary>
-    public class Bone : Transformable
+    public class Bone : Transformable, IEquatable<Bone> 
     {
         internal Chronometer SpriteChrono { get; set; }
         /// <summary>
@@ -838,6 +833,10 @@ namespace WGP.SFDynamicObject
             OutlineThickness = 0;
             BlendMode = BlendModeType.BLEND_ALPHA;
         }
+
+        public bool Equals(Bone other) => ID.Equals(other.ID);
+        public override int GetHashCode() => ID.GetHashCode();
+        public override bool Equals(object obj) => Equals((Bone)obj);
     }
     public class DynamicSprite
     {
