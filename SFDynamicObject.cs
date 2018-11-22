@@ -420,7 +420,7 @@ namespace WGP.SFDynamicObject
         /// </summary>
         public DynamicSprite()
         {
-            InternalRect = null;
+            InternalRect = new RectangleShape();
             Resource = null;
         }
 
@@ -461,6 +461,8 @@ namespace WGP.SFDynamicObject
         {
             if (InternalRect != null && Resource != null)
                 InternalRect.Texture = Resource.GetTexture(timer);
+            else if (InternalRect != null)
+                InternalRect.Texture = null;
         }
 
         #endregion Public Methods
@@ -514,6 +516,7 @@ namespace WGP.SFDynamicObject
             Animations = new List<Animation>();
             UsedResources = new List<Resource>();
             currentAnim = null;
+            mainChrono = null;
             ResetAnimation();
         }
 
@@ -872,6 +875,16 @@ namespace WGP.SFDynamicObject
         /// </summary>
         public void Update()
         {
+            if (mainChrono != null)
+            {
+                foreach (var bone in BonesHierarchy)
+                {
+                    if (bone.SpriteChrono == null)
+                        bone.SpriteChrono = new Chronometer(mainChrono);
+                    if (bone.AttachedSprite != null)
+                        bone.AttachedSprite.Update(bone.SpriteChrono.ElapsedTime);
+                }
+            }
             if (currentAnim != null && Chronometer != null)
             {
                 if (Chronometer.ElapsedTime > currentAnim.Duration)
@@ -886,10 +899,6 @@ namespace WGP.SFDynamicObject
 
                 foreach (var bone in BonesHierarchy)
                 {
-                    if (bone.SpriteChrono == null)
-                        bone.SpriteChrono = new Chronometer(mainChrono);
-                    if (bone.AttachedSprite != null)
-                        bone.AttachedSprite.Update(bone.SpriteChrono.ElapsedTime);
                     bone.Opacity = 255;
                     bone.Color = Color.White;
                     bone.OutlineColor = Color.White;
