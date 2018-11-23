@@ -928,9 +928,9 @@ namespace WGP.SFDynamicObject
                             Animation.Key second = states.Last();
                             foreach (var state in states)
                             {
-                                if (first.Position < state.Position && state.Position < currentTime)
+                                if (first.Position <= state.Position && state.Position <= currentTime)
                                     first = state;
-                                if (second.Position > state.Position && state.Position > currentTime)
+                                if (second.Position >= state.Position && state.Position >= currentTime)
                                     second = state;
                             }
                             Transformable tr = new Transformable();
