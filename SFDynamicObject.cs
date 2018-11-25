@@ -3,6 +3,7 @@ using SFML.System;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace WGP.SFDynamicObject
 {
@@ -473,6 +474,67 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class SFDynamicObject : Transformable, Drawable
     {
+        public void LoadOldVersion_1_1_0_1_to_2_0(System.IO.Stream input, convert.ResourceManager manager)
+        {
+            string content;
+            {
+                var sr = new System.IO.StreamReader(input);
+                content = sr.ReadToEnd();
+            }
+            Version = CurrentVersion;
+            oldAnimState = null;
+            TransitionTime = Time.Zero;
+            buffer = new Queue<Animation>();
+            BonesHierarchy = new List<Bone>();
+            MasterBones = new List<Bone>();
+            Animations = new List<Animation>();
+            UsedResources = new List<Resource>();
+            currentAnim = null;
+            ResetAnimation();
+            foreach (var item in manager)
+            {
+                var res = new Resource();
+                res.ChangeBaseImage(((Texture)item.Value.Data).CopyToImage());
+                res.AdaptFrameSize();
+                res.Name = item.Key;
+                UsedResources.Add(res);
+            }
+            convert.FormatJSON fjs = Newtonsoft.Json.JsonConvert.DeserializeObject<convert.FormatJSON>(content);
+            BonesHierarchy = fjs.Hierarchy.Select((bone) =>
+            {
+                var tmp = new Bone();
+                tmp.AttachedSprite = new DynamicSprite();
+                if (bone.Sprites != null && bone.Sprites.Length > 0)
+                {
+                    var sprite = bone.Sprites[0];
+                    tmp.AttachedSprite.InternalRect.TextureRect = sprite.TextureRect;
+                    tmp.AttachedSprite.InternalRect.Size = sprite.Size;
+                    tmp.AttachedSprite.InternalRect.Position = sprite.Transform.Position;
+                    tmp.AttachedSprite.InternalRect.Origin = sprite.Transform.Origin;
+                    tmp.AttachedSprite.InternalRect.Scale = sprite.Transform.Scale;
+                    tmp.AttachedSprite.InternalRect.Rotation = sprite.Transform.Rotation;
+                    if (sprite.TextureID != null && sprite.TextureID != "")
+                        tmp.AttachedSprite.Resource = UsedResources.Find((res) => res.Name == sprite.TextureID);
+                }
+                tmp.BlendMode = bone.BlendMode;
+                tmp.Name = bone.Name;
+                tmp.Position = bone.Transform.Position;
+                tmp.Origin = bone.Transform.Origin;
+                tmp.Scale = bone.Transform.Scale;
+                tmp.Rotation = bone.Transform.Rotation;
+
+                return tmp;
+            }).ToList();
+            foreach (var b in fjs.Hierarchy)
+            {
+                var bone = BonesHierarchy.Find((other) => other.Name == b.Name);
+                foreach (var child in b.Children)
+                {
+                    bone.Children.Add(BonesHierarchy.Find((other) => other.Name == child));
+                }
+            }
+        }
+
         #region Public Fields
 
         /// <summary>
