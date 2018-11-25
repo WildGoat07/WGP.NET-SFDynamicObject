@@ -477,9 +477,12 @@ namespace WGP.SFDynamicObject
         public void LoadOldVersion_1_1_0_1_to_2_0(System.IO.Stream input, convert.ResourceManager manager)
         {
             string content;
+            convert.FormatJSON fjs;
             {
-                var sr = new System.IO.StreamReader(input);
-                content = sr.ReadToEnd();
+                var sr = new System.IO.StreamReader(input, Encoding.Unicode);
+                var deser = new Newtonsoft.Json.JsonSerializer();
+                deser.MissingMemberHandling = Newtonsoft.Json.MissingMemberHandling.Ignore;
+                fjs = deser.Deserialize<convert.FormatJSON>(new Newtonsoft.Json.JsonTextReader(sr));
             }
             Version = CurrentVersion;
             oldAnimState = null;
@@ -499,7 +502,6 @@ namespace WGP.SFDynamicObject
                 res.Name = item.Key;
                 UsedResources.Add(res);
             }
-            convert.FormatJSON fjs = Newtonsoft.Json.JsonConvert.DeserializeObject<convert.FormatJSON>(content);
             BonesHierarchy = fjs.Hierarchy.Select((bone) =>
             {
                 var tmp = new Bone();
@@ -533,6 +535,47 @@ namespace WGP.SFDynamicObject
                     bone.Children.Add(BonesHierarchy.Find((other) => other.Name == child));
                 }
             }
+            MasterBones = fjs.Masters.Select((str) => BonesHierarchy.Find((bone) => bone.Name == str)).ToList();
+            Animations = fjs.Animations.Select((anim) =>
+                {
+                    var tmpAnim = new Animation();
+                    tmpAnim.Name = anim.Name;
+                    tmpAnim.Duration = Time.FromMicroseconds(anim.Duration);
+                    tmpAnim.Bones = anim.Bones.Select((couple) =>
+                    {
+                        var tmpCouple = new Couple<Bone, List<Animation.Key>>();
+                        tmpCouple.Key = BonesHierarchy.Find((bone) => bone.Name == couple.BoneName);
+                        tmpCouple.Value = couple.Keys.Select((key) =>
+                        {
+                            var tmpKey = new Animation.Key();
+                            tmpKey.Color = key.Color;
+                            tmpKey.ColorFctCoeff = key.ColCoeff;
+                            tmpKey.ColorFunction = (Animation.Key.Fct)key.ColFunction;
+                            tmpKey.Opacity = key.Opacity;
+                            tmpKey.OpacityFctCoeff = key.OpaCoeff;
+                            tmpKey.OpacityFunction = (Animation.Key.Fct)key.OpaFunction;
+                            tmpKey.OriginFctCoeff = key.OriCoeff;
+                            tmpKey.OriginFunction = (Animation.Key.Fct)key.OriFunction;
+                            tmpKey.OutlineColor = key.OutlineColor;
+                            tmpKey.OutlineColorFctCoeff = key.OCoCoeff;
+                            tmpKey.OutlineColorFunction = (Animation.Key.Fct)key.OCoFunction;
+                            tmpKey.OutlineThickness = key.OutlineThickness;
+                            tmpKey.OutlineThicknessFctCoeff = key.OThCoeff;
+                            tmpKey.OutlineThicknessFunction = (Animation.Key.Fct)key.OThFunction;
+                            tmpKey.Transform.Position = key.Transform.Position;
+                            tmpKey.Transform.Origin = key.Transform.Origin;
+                            tmpKey.Transform.Scale = key.Transform.Scale;
+                            tmpKey.Transform.Rotation = key.Transform.Rotation;
+                            tmpKey.Position = Time.FromMicroseconds(key.Position);
+
+                            return tmpKey;
+                        }).ToList();
+
+                        return tmpCouple;
+                    }).ToList();
+
+                    return tmpAnim;
+                }).ToList();
         }
 
         #region Public Fields
