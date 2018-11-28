@@ -12,7 +12,7 @@ namespace WGP.SFDynamicObject
     /// animation by cropping the image.
     /// </summary>
     [Serializable]
-    public class Resource : ISerializable, IDisposable
+    public class Resource : ISerializable, IDisposable, IBaseElement
     {
         #region Private Fields
 
