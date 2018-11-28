@@ -44,6 +44,7 @@ namespace WGP.SFDynamicObject
         /// </summary>
         public Animation()
         {
+            ID = Guid.NewGuid();
             Name = null;
             Bones = new List<Couple<Bone, List<Key>>>();
             Triggers = new List<EventTrigger>();
