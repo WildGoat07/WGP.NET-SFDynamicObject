@@ -12,8 +12,16 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class DynamicObjectBuilder
     {
+        #region Private Fields
+
         private List<Resource> resources;
+
         private Dictionary<string, FormatData> templates;
+
+        #endregion Private Fields
+
+        #region Public Constructors
+
         /// <summary>
         /// Constructor.
         /// </summary>
@@ -22,6 +30,20 @@ namespace WGP.SFDynamicObject
             templates = new Dictionary<string, FormatData>();
             resources = new List<Resource>();
         }
+
+        #endregion Public Constructors
+
+        #region Public Properties
+
+        /// <summary>
+        /// Returns a list of all the stored resources in the builder.
+        /// </summary>
+        public IReadOnlyList<Resource> Resources => resources.AsReadOnly();
+
+        #endregion Public Properties
+
+        #region Public Methods
+
         /// <summary>
         /// Create an instance from a template.
         /// </summary>
@@ -117,6 +139,19 @@ namespace WGP.SFDynamicObject
                         }));
                         return new Couple<Bone, List<Animation.Key>>(selectedBone, tmp2);
                     }));
+                    if (anim.Triggers != null)
+                    {
+                        tmp1.Triggers = anim.Triggers.Select((t) =>
+                        {
+                            var tmp2 = new EventTrigger();
+                            tmp2.Area = t.Area;
+                            tmp2.ID = new Guid(t.ID);
+                            tmp2.Name = t.Name;
+                            tmp2.Time = t.Time;
+
+                            return tmp2;
+                        }).ToList();
+                    }
                     tmp1.Duration = Time.FromMicroseconds(anim.Duration);
 
                     return tmp1;
@@ -130,6 +165,7 @@ namespace WGP.SFDynamicObject
                 throw new Exception("An Error occurenced", e);
             }
         }
+
         /// <summary>
         /// Adds a template to the builder's dictionnary.
         /// </summary>
@@ -142,6 +178,7 @@ namespace WGP.SFDynamicObject
             resources.AddRange(tmp.Resources);
             templates.Add(name, tmp);
         }
+
         /// <summary>
         /// Remove a template from the builder's dictionnary.
         /// </summary>
@@ -161,5 +198,7 @@ namespace WGP.SFDynamicObject
             catch (Exception)
             { }
         }
+
+        #endregion Public Methods
     }
 }

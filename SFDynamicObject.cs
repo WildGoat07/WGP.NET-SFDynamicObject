@@ -46,6 +46,7 @@ namespace WGP.SFDynamicObject
         {
             Name = null;
             Bones = new List<Couple<Bone, List<Key>>>();
+            Triggers = new List<EventTrigger>();
         }
 
         #endregion Public Constructors
@@ -71,6 +72,11 @@ namespace WGP.SFDynamicObject
         /// The name of the animation. Needed when loading an animation.
         /// </summary>
         public string Name { get; set; }
+
+        /// <summary>
+        /// Event triggers in the animation.
+        /// </summary>
+        public List<EventTrigger> Triggers { get; set; }
 
         #endregion Public Properties
 
@@ -469,6 +475,63 @@ namespace WGP.SFDynamicObject
     }
 
     /// <summary>
+    /// An event that calls a function when triggered.
+    /// </summary>
+    public class EventTrigger
+    {
+        #region Internal Fields
+
+        internal bool triggered;
+
+        #endregion Internal Fields
+
+        #region Public Constructors
+
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        public EventTrigger()
+        {
+            ID = Guid.NewGuid();
+            Name = null;
+            Trigger = null;
+            Area = default;
+            Time = default;
+        }
+
+        #endregion Public Constructors
+
+        #region Public Properties
+
+        /// <summary>
+        /// Area triggered by the event.
+        /// </summary>
+        public FloatRect Area { get; set; }
+
+        /// <summary>
+        /// Universal identifier of the event.
+        /// </summary>
+        public Guid ID { get; internal set; }
+
+        /// <summary>
+        /// Name describing the event.
+        /// </summary>
+        public string Name { get; set; }
+
+        /// <summary>
+        /// Time at which is triggered the event.
+        /// </summary>
+        public Time Time { get; set; }
+
+        /// <summary>
+        /// Function called by the event when triggered.
+        /// </summary>
+        public Action Trigger { get; set; }
+
+        #endregion Public Properties
+    }
+
+    /// <summary>
     /// Dynamic object. Supports multi sprite, bones and animations.
     /// </summary>
     public class SFDynamicObject : Transformable, Drawable
@@ -478,7 +541,7 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// Version of the current SFDynamicObject encoder/decoder.
         /// </summary>
-        public static readonly Version CurrentVersion = new Version(2, 0, 0, 0);
+        public static readonly Version CurrentVersion = new Version(2, 0, 0, 1);
 
         #endregion Public Fields
 
@@ -517,6 +580,7 @@ namespace WGP.SFDynamicObject
             UsedResources = new List<Resource>();
             currentAnim = null;
             mainChrono = null;
+            Triggers = new List<EventTrigger>();
             ResetAnimation();
         }
 
@@ -569,6 +633,11 @@ namespace WGP.SFDynamicObject
         /// Time between animations to smooth the transition.
         /// </summary>
         public Time TransitionTime { get; set; }
+
+        /// <summary>
+        /// Event triggers of the object.
+        /// </summary>
+        public List<EventTrigger> Triggers { get; set; }
 
         /// <summary>
         /// Resources used by this object. Should contains ALL resources used. Unused ones can be
@@ -726,6 +795,13 @@ namespace WGP.SFDynamicObject
                 currentAnim = null;
             else
             {
+                if (anim.Triggers != null)
+                {
+                    foreach (var item in anim.Triggers)
+                    {
+                        item.triggered = false;
+                    }
+                }
                 currentAnim = anim;
                 transforms = new Dictionary<Bone, Transformable>();
                 if (currentAnim.Bones != null)
@@ -855,6 +931,16 @@ namespace WGP.SFDynamicObject
 
                         return tmp2;
                     }).ToArray();
+                    tmp.Triggers = anim.Triggers.Select((t) =>
+                    {
+                        var tmp2 = new Trigger();
+                        tmp2.Area = t.Area;
+                        tmp2.ID = t.ID.ToByteArray();
+                        tmp2.Name = t.Name;
+                        tmp2.Time = t.Time;
+
+                        return tmp2;
+                    }).ToArray();
                     tmp.Duration = anim.Duration.Microseconds;
 
                     return tmp;
@@ -892,11 +978,34 @@ namespace WGP.SFDynamicObject
                     if (buffer.Count > 0)
                         LoadAnimation(buffer.Dequeue());
                     else
+                    {
                         Chronometer.Restart();
+                        if (currentAnim.Triggers != null)
+                        {
+                            foreach (var item in currentAnim.Triggers)
+                            {
+                                item.triggered = false;
+                            }
+                        }
+                    }
                 }
                 Time currentTime = Chronometer.ElapsedTime;
                 Time currentFadeTime = fadeChrono.ElapsedTime;
-
+                if (currentAnim.Triggers != null)
+                {
+                    foreach (var item in currentAnim.Triggers)
+                    {
+                        if (!item.triggered)
+                        {
+                            if (currentTime > item.Time)
+                            {
+                                item.triggered = true;
+                                if (item.Trigger != null)
+                                    item.Trigger.Invoke();
+                            }
+                        }
+                    }
+                }
                 foreach (var bone in BonesHierarchy)
                 {
                     bone.Opacity = 255;
