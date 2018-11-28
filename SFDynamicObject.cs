@@ -37,6 +37,8 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class Animation
     {
+        public void Fix() => ID = Guid.NewGuid();
+
         #region Public Constructors
 
         /// <summary>
