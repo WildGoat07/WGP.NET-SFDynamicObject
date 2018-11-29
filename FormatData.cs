@@ -192,7 +192,8 @@ namespace WGP.SFDynamicObject
 
         public FormatData(SerializationInfo info, StreamingContext context)
         {
-            info.TryGetValue("Categories", out Categories);
+            if (!info.TryGetValue("Categories", out Categories))
+                Categories = new CategoryData[0];
             Animations = (AnimationData[])info.GetValue("Animations", typeof(AnimationData[]));
             Hierarchy = (BoneData[])info.GetValue("Hierarchy", typeof(BoneData[]));
             Masters = (byte[][])info.GetValue("Masters", typeof(byte[][]));
