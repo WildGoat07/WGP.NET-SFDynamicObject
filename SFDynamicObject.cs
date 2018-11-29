@@ -2,6 +2,7 @@
 using SFML.System;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 
 namespace WGP.SFDynamicObject
@@ -48,6 +49,16 @@ namespace WGP.SFDynamicObject
 
         #region Private Fields
 
+        /// <summary>
+        /// The default category of the object.
+        /// </summary>
+        public readonly Category DefaultCategory;
+
+        /// <summary>
+        /// Custom categories, to add more control over the object.
+        /// </summary>
+        public List<Category> CustomCategories { get; set; }
+
         private Queue<Animation> buffer;
 
         private Chronometer chronometer;
@@ -71,16 +82,29 @@ namespace WGP.SFDynamicObject
         /// </summary>
         public SFDynamicObject()
         {
+            DefaultCategory = new Category(true);
             Version = CurrentVersion;
             oldAnimState = null;
             TransitionTime = Time.Zero;
             buffer = new Queue<Animation>();
-            BonesHierarchy = new List<Bone>();
+            BonesHierarchy = new ObservableCollection<Bone>();
+            BonesHierarchy.CollectionChanged += (sender, e) =>
+            {
+                if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add)
+                {
+                    foreach (Bone bone in e.NewItems)
+                    {
+                        if (bone.Category == null)
+                        bone.Category = DefaultCategory;
+                    }
+                }
+            };
             MasterBones = new List<Bone>();
             Animations = new List<Animation>();
             UsedResources = new List<Resource>();
             currentAnim = null;
             mainChrono = null;
+            CustomCategories = new List<Category>();
             Triggers = new List<EventTrigger>();
             ResetAnimation();
         }
@@ -98,7 +122,7 @@ namespace WGP.SFDynamicObject
         /// The hierarchy of the bones. All bones must be here. The order in the hierarchy will be
         /// the order of drawing the sprites from the bones.
         /// </summary>
-        public List<Bone> BonesHierarchy { get; set; }
+        public ObservableCollection<Bone> BonesHierarchy { get; private set; }
 
         /// <summary>
         /// Chronometer of the animation. Need to be set to animate. Create a relative chronometer
@@ -183,7 +207,7 @@ namespace WGP.SFDynamicObject
                         target.Draw(sprite, st);
                     }
                 }
-                if (bone.AttachedSprite != null)
+                if (bone.AttachedSprite != null && bone.Category.Enabled)
                 {
                     var sprite = bone.AttachedSprite;
                     RenderStates st = new RenderStates(states);
@@ -385,9 +409,19 @@ namespace WGP.SFDynamicObject
                     }
                     else
                         tmp.Sprite = null;
+                    tmp.Category = bone.Category.ID.ToByteArray();
+
                     return tmp;
                 }).ToArray();
                 result.Masters = MasterBones.Select((bone) => bone.ID.ToByteArray()).ToArray();
+                result.Categories = CustomCategories.Select((categ) =>
+                {
+                    var tmp = new CategoryData();
+                    tmp.Name = categ.Name;
+                    tmp.ID = categ.ID.ToByteArray();
+
+                    return tmp;
+                }).ToArray();
                 result.Animations = Animations.Select((anim) =>
                 {
                     var tmp = new AnimationData();

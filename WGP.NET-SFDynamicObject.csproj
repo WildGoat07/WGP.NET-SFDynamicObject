@@ -86,6 +86,7 @@
   <ItemGroup>
     <Compile Include="Animation.cs" />
     <Compile Include="Bone.cs" />
+    <Compile Include="Category.cs" />
     <Compile Include="Couple.cs" />
     <Compile Include="DynamicObjectBuilder.cs" />
     <Compile Include="DynamicSprite.cs" />

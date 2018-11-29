@@ -11,6 +11,8 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class Bone : Transformable, IEquatable<Bone>, IBaseElement
     {
+        public Category Category;
+
         #region Public Constructors
 
         /// <summary>

@@ -64,7 +64,15 @@ namespace WGP.SFDynamicObject
             {
                 var result = new SFDynamicObject();
                 result.Version = new Version(copyFrom.Version);
-                result.BonesHierarchy.AddRange(copyFrom.Hierarchy.Select((bone) =>
+                result.CustomCategories = copyFrom.Categories.Select((categ) =>
+                {
+                    var tmp = new Category();
+                    tmp.ID = new Guid(categ.ID);
+                    tmp.Name = categ.Name;
+
+                    return tmp;
+                }).ToList();
+                foreach (var bone in copyFrom.Hierarchy)
                 {
                     var tmp = new Bone();
                     tmp.BlendMode = bone.BlendMode;
@@ -88,12 +96,16 @@ namespace WGP.SFDynamicObject
                         if (bone.Sprite.TextureID != null)
                             tmp.AttachedSprite.Resource = resources.Find((res) => res.ID == new Guid(bone.Sprite.TextureID));
                     }
+                    if (new Guid(bone.Category) == result.DefaultCategory.ID)
+                        tmp.Category = result.DefaultCategory;
+                    else
+                        tmp.Category = result.CustomCategories.Find((categ) => categ.ID == new Guid(bone.Category));
 
-                    return tmp;
-                }));
+                    result.BonesHierarchy.Add(tmp);
+                }
                 for (int i = 0; i < copyFrom.Hierarchy.Length; i++)
-                    result.BonesHierarchy[i].Children.AddRange(copyFrom.Hierarchy[i].Children.Select((id) => result.BonesHierarchy.Find((bone) => bone.ID == new Guid(id))));
-                result.MasterBones.AddRange(copyFrom.Masters.Select((id) => result.BonesHierarchy.Find((bone) => bone.ID == new Guid(id))));
+                    result.BonesHierarchy[i].Children.AddRange(copyFrom.Hierarchy[i].Children.Select((id) => result.BonesHierarchy.First((bone) => bone.ID == new Guid(id))));
+                result.MasterBones.AddRange(copyFrom.Masters.Select((id) => result.BonesHierarchy.First((bone) => bone.ID == new Guid(id))));
                 result.Animations.AddRange(copyFrom.Animations.Select((anim) =>
                 {
                     var tmp1 = new Animation();
@@ -102,7 +114,7 @@ namespace WGP.SFDynamicObject
                     tmp1.Bones.AddRange(anim.Bones.Select((bone) =>
                     {
                         var tmp2 = new List<Animation.Key>();
-                        var selectedBone = result.BonesHierarchy.Find((b) => b.ID == new Guid(bone.BoneID));
+                        var selectedBone = result.BonesHierarchy.First((b) => b.ID == new Guid(bone.BoneID));
                         tmp2.AddRange(bone.Keys.Select((key) =>
                         {
                             var tmp3 = new Animation.Key();

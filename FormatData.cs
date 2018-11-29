@@ -90,6 +90,7 @@ namespace WGP.SFDynamicObject
         #region Public Fields
 
         public BlendModeType BlendMode;
+        public byte[] Category;
         public byte[][] Children;
         public byte[] ID;
         public string Name;
@@ -106,6 +107,8 @@ namespace WGP.SFDynamicObject
 
         public BoneData(SerializationInfo info, StreamingContext context)
         {
+            if (!info.TryGetValue("Category", out Category))
+                Category = new Guid().ToByteArray();
             BlendMode = (BlendModeType)info.GetValue("BlendMode", typeof(BlendModeType));
             Children = (byte[][])info.GetValue("Children", typeof(byte[][]));
             ID = (byte[])info.GetValue("ID", typeof(byte[]));
@@ -120,6 +123,7 @@ namespace WGP.SFDynamicObject
 
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
+            info.AddValue("Category", Category);
             info.AddValue("BlendMode", BlendMode);
             info.AddValue("Children", Children);
             info.AddValue("ID", ID);
@@ -132,11 +136,47 @@ namespace WGP.SFDynamicObject
     }
 
     [Serializable]
+    internal class CategoryData : ISerializable
+    {
+        #region Public Fields
+
+        public byte[] ID;
+        public string Name;
+
+        #endregion Public Fields
+
+        #region Public Constructors
+
+        public CategoryData()
+        {
+        }
+
+        public CategoryData(SerializationInfo info, StreamingContext context)
+        {
+            ID = (byte[])info.GetValue("ID", typeof(byte[]));
+            Name = (string)info.GetValue("Name", typeof(string));
+        }
+
+        #endregion Public Constructors
+
+        #region Public Methods
+
+        public void GetObjectData(SerializationInfo info, StreamingContext context)
+        {
+            info.AddValue("ID", ID);
+            info.AddValue("Name", Name);
+        }
+
+        #endregion Public Methods
+    }
+
+    [Serializable]
     internal class FormatData : ISerializable
     {
         #region Public Fields
 
         public AnimationData[] Animations;
+        public CategoryData[] Categories;
         public BoneData[] Hierarchy;
         public byte[][] Masters;
         public Resource[] Resources;
@@ -152,6 +192,7 @@ namespace WGP.SFDynamicObject
 
         public FormatData(SerializationInfo info, StreamingContext context)
         {
+            info.TryGetValue("Categories", out Categories);
             Animations = (AnimationData[])info.GetValue("Animations", typeof(AnimationData[]));
             Hierarchy = (BoneData[])info.GetValue("Hierarchy", typeof(BoneData[]));
             Masters = (byte[][])info.GetValue("Masters", typeof(byte[][]));
@@ -165,6 +206,7 @@ namespace WGP.SFDynamicObject
 
         public void GetObjectData(SerializationInfo info, StreamingContext context)
         {
+            info.AddValue("Categories", Categories);
             info.AddValue("Animations", Animations);
             info.AddValue("Hierarchy", Hierarchy);
             info.AddValue("Masters", Masters);
