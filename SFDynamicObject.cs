@@ -43,7 +43,7 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// Version of the current SFDynamicObject encoder/decoder.
         /// </summary>
-        public static readonly Version CurrentVersion = new Version(2, 0, 0, 1);
+        public static readonly Version CurrentVersion = new Version(2, 0, 0, 2);
 
         #endregion Public Fields
 
@@ -95,7 +95,7 @@ namespace WGP.SFDynamicObject
                     foreach (Bone bone in e.NewItems)
                     {
                         if (bone.Category == null)
-                        bone.Category = DefaultCategory;
+                            bone.Category = DefaultCategory;
                     }
                 }
             };
