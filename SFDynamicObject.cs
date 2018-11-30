@@ -94,9 +94,15 @@ namespace WGP.SFDynamicObject
                 {
                     foreach (Bone bone in e.NewItems)
                     {
+                        bone.Owner = this;
                         if (bone.Category == null)
                             bone.Category = DefaultCategory;
                     }
+                }
+                if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Replace || e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Remove)
+                {
+                    foreach (Bone bone in e.OldItems)
+                        bone.Owner = null;
                 }
             };
             MasterBones = new List<Bone>();

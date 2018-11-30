@@ -32,11 +32,17 @@ namespace WGP.SFDynamicObject
             OutlineColor = Color.White;
             OutlineThickness = 0;
             BlendMode = BlendModeType.BLEND_ALPHA;
+            Owner = null;
         }
 
         #endregion Public Constructors
 
         #region Public Properties
+
+        /// <summary>
+        /// The current owner of the bone.
+        /// </summary>
+        public SFDynamicObject Owner { get; internal set; }
 
         /// <summary>
         /// The list of sprites affected by the changes of the bone. Be careful of the order (the
