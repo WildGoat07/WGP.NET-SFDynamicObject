@@ -57,7 +57,7 @@ namespace WGP.SFDynamicObject
         /// <param name="timer">Current time for the texture.</param>
         public void Update(Time timer)
         {
-            if (InternalRect != null && Resource != null)
+            if (InternalRect != null && Resource != null && !Resource.Disposed)
                 InternalRect.Texture = Resource.GetTexture(timer);
             else if (InternalRect != null)
                 InternalRect.Texture = null;

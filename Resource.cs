@@ -14,6 +14,11 @@ namespace WGP.SFDynamicObject
     [Serializable]
     public class Resource : ISerializable, IDisposable, IBaseElement
     {
+        /// <summary>
+        /// True if the resource has been disposed.
+        /// </summary>
+        public bool Disposed => disposed;
+
         #region Private Fields
 
         private Image _baseImage;
