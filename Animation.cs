@@ -11,20 +11,17 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class Animation : IBaseElement
     {
-        #region Public Constructors
+        #region Internal Constructors
 
-        /// <summary>
-        /// Constructor.
-        /// </summary>
-        public Animation()
+        internal Animation()
         {
             ID = Guid.NewGuid();
             Name = null;
             Bones = new List<Couple<Bone, List<Key>>>();
-            Triggers = new List<EventTrigger>();
+            _triggers = new List<EventTrigger>();
         }
 
-        #endregion Public Constructors
+        #endregion Internal Constructors
 
         #region Public Properties
 
@@ -49,11 +46,57 @@ namespace WGP.SFDynamicObject
         public string Name { get; set; }
 
         /// <summary>
+        /// Dynamic Object containing this resource.
+        /// </summary>
+        public SFDynamicObject Owner { get; internal set; }
+
+        /// <summary>
         /// Event triggers in the animation.
         /// </summary>
-        public List<EventTrigger> Triggers { get; set; }
+        public EventTrigger[] Triggers => _triggers.ToArray();
 
         #endregion Public Properties
+
+        #region Internal Properties
+
+        internal List<EventTrigger> _triggers { get; set; }
+
+        #endregion Internal Properties
+
+        #region Public Methods
+
+        /// <summary>
+        /// Creates a new event for this animation.
+        /// </summary>
+        /// <returns>New event.</returns>
+        public EventTrigger CreateEvent()
+        {
+            EventTrigger result = new EventTrigger();
+            result.Owner = Owner;
+            result.Animation = this;
+            _triggers.Add(result);
+            return result;
+        }
+
+        /// <summary>
+        /// Removes an event.
+        /// </summary>
+        /// <param name="ev">Event to remove.</param>
+        /// <returns>True if successful.</returns>
+        public bool RemoveEvent(EventTrigger ev)
+        {
+            if (ev.Animation == this)
+            {
+                ev.Owner = null;
+                ev.Animation = null;
+                _triggers.Remove(ev);
+                return true;
+            }
+            else
+                return false;
+        }
+
+        #endregion Public Methods
 
         #region Public Classes
 

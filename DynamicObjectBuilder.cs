@@ -64,17 +64,15 @@ namespace WGP.SFDynamicObject
             {
                 var result = new SFDynamicObject();
                 result.Version = new Version(copyFrom.Version);
-                result.CustomCategories = copyFrom.Categories.Select((categ) =>
+                copyFrom.Categories.ForEach((categ) =>
                 {
-                    var tmp = new Category();
+                    var tmp = result.CreateCustomCategory();
                     tmp.ID = new Guid(categ.ID);
                     tmp.Name = categ.Name;
-
-                    return tmp;
-                }).ToList();
+                });
                 foreach (var bone in copyFrom.Hierarchy)
                 {
-                    var tmp = new Bone();
+                    var tmp = result.CreateBone();
                     tmp.BlendMode = bone.BlendMode;
                     tmp.Name = bone.Name;
                     tmp.ID = new Guid(bone.ID);
@@ -99,22 +97,21 @@ namespace WGP.SFDynamicObject
                     if (new Guid(bone.Category) == result.DefaultCategory.ID)
                         tmp.Category = result.DefaultCategory;
                     else
-                        tmp.Category = result.CustomCategories.Find((categ) => categ.ID == new Guid(bone.Category));
-
-                    result.BonesHierarchy.Add(tmp);
+                        tmp.Category = result._customCategories.Find((categ) => categ.ID == new Guid(bone.Category));
                 }
                 for (int i = 0; i < copyFrom.Hierarchy.Length; i++)
-                    result.BonesHierarchy[i].Children.AddRange(copyFrom.Hierarchy[i].Children.Select((id) => result.BonesHierarchy.First((bone) => bone.ID == new Guid(id))));
-                result.MasterBones.AddRange(copyFrom.Masters.Select((id) => result.BonesHierarchy.First((bone) => bone.ID == new Guid(id))));
-                result.Animations.AddRange(copyFrom.Animations.Select((anim) =>
+                    result._bonesHierarchy[i].Children.AddRange(copyFrom.Hierarchy[i].Children.Select((id) => result._bonesHierarchy.First((bone) => bone.ID == new Guid(id))));
+                foreach (var b in copyFrom.Masters)
+                    result.SetMasterBone(result.BonesHierarchy.First((bone) => bone.ID == new Guid(b)));
+                copyFrom.Animations.ForEach((anim) =>
                 {
-                    var tmp1 = new Animation();
+                    var tmp1 = result.CreateAnimation();
                     tmp1.ID = new Guid(anim.ID);
                     tmp1.Name = anim.Name;
                     tmp1.Bones.AddRange(anim.Bones.Select((bone) =>
                     {
                         var tmp2 = new List<Animation.Key>();
-                        var selectedBone = result.BonesHierarchy.First((b) => b.ID == new Guid(bone.BoneID));
+                        var selectedBone = result._bonesHierarchy.First((b) => b.ID == new Guid(bone.BoneID));
                         tmp2.AddRange(bone.Keys.Select((key) =>
                         {
                             var tmp3 = new Animation.Key();
@@ -153,28 +150,25 @@ namespace WGP.SFDynamicObject
                     }));
                     if (anim.Triggers != null)
                     {
-                        tmp1.Triggers = anim.Triggers.Select((t) =>
+                        anim.Triggers.Select((t) =>
                         {
-                            var tmp2 = new EventTrigger();
+                            var tmp2 = tmp1.CreateEvent();
                             tmp2.Area = t.Area;
                             tmp2.ID = new Guid(t.ID);
                             tmp2.Name = t.Name;
                             tmp2.Time = t.Time;
 
                             return tmp2;
-                        }).ToList();
+                        });
                     }
                     tmp1.Duration = Time.FromMicroseconds(anim.Duration);
-
-                    return tmp1;
-                }));
-                result.UsedResources = copyFrom.Resources.ToList();
+                });
 
                 return result;
             }
             catch (Exception e)
             {
-                throw new Exception("An Error occurenced", e);
+                throw new Exception("An Error occurenced creating the object", e);
             }
         }
 

@@ -12,6 +12,7 @@ namespace WGP.SFDynamicObject
 
         Guid ID { get; }
         string Name { get; }
+        SFDynamicObject Owner { get; }
 
         #endregion Public Properties
     }

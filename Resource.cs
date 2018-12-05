@@ -12,13 +12,8 @@ namespace WGP.SFDynamicObject
     /// animation by cropping the image.
     /// </summary>
     [Serializable]
-    public class Resource : ISerializable, IDisposable, IBaseElement
+    public class Resource : ISerializable, IDisposable
     {
-        /// <summary>
-        /// True if the resource has been disposed.
-        /// </summary>
-        public bool Disposed => disposed;
-
         #region Private Fields
 
         private Image _baseImage;
@@ -45,21 +40,6 @@ namespace WGP.SFDynamicObject
 
         #region Public Constructors
 
-        /// <summary>
-        /// Constructor.
-        /// </summary>
-        public Resource()
-        {
-            disposed = false;
-            ID = Guid.NewGuid();
-            BaseImage = null;
-            textures = null;
-            FramesPerSecond = 0;
-            FrameSize = default;
-            Repeated = false;
-            Smooth = false;
-        }
-
         public Resource(SerializationInfo info, StreamingContext context) : this()
         {
             Name = info.GetString("Name");
@@ -75,6 +55,21 @@ namespace WGP.SFDynamicObject
                 FramesPosition = (Vector2i[])info.GetValue("FramesPosition", typeof(Vector2i[]));
             }
             Update();
+        }
+
+        /// <summary>
+        /// Constructor.
+        /// </summary>
+        public Resource()
+        {
+            disposed = false;
+            ID = Guid.NewGuid();
+            BaseImage = null;
+            textures = null;
+            FramesPerSecond = 0;
+            FrameSize = default;
+            Repeated = false;
+            Smooth = false;
         }
 
         #endregion Public Constructors
@@ -119,6 +114,11 @@ namespace WGP.SFDynamicObject
                 _baseImage = value;
             }
         }
+
+        /// <summary>
+        /// True if the resource has been disposed.
+        /// </summary>
+        public bool Disposed => disposed;
 
         /// <summary>
         /// Size of the texture(s).

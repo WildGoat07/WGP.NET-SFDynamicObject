@@ -11,14 +11,15 @@ namespace WGP.SFDynamicObject
     /// </summary>
     public class Bone : Transformable, IEquatable<Bone>, IBaseElement
     {
-        public Category Category;
+        #region Private Fields
 
-        #region Public Constructors
+        private Category _category;
 
-        /// <summary>
-        /// Constructor.
-        /// </summary>
-        public Bone()
+        #endregion Private Fields
+
+        #region Internal Constructors
+
+        internal Bone()
         {
             ID = Guid.NewGuid();
             SpriteChrono = null;
@@ -35,14 +36,9 @@ namespace WGP.SFDynamicObject
             Owner = null;
         }
 
-        #endregion Public Constructors
+        #endregion Internal Constructors
 
         #region Public Properties
-
-        /// <summary>
-        /// The current owner of the bone.
-        /// </summary>
-        public SFDynamicObject Owner { get; internal set; }
 
         /// <summary>
         /// The list of sprites affected by the changes of the bone. Be careful of the order (the
@@ -54,6 +50,19 @@ namespace WGP.SFDynamicObject
         /// BlendMode used to draw this bone.
         /// </summary>
         public BlendModeType BlendMode { get; set; }
+
+        /// <summary>
+        /// Category of the bone.
+        /// </summary>
+        public Category Category
+        {
+            get => _category;
+            set
+            {
+                if (value != null && value.Owner == Owner)
+                    _category = value;
+            }
+        }
 
         /// <summary>
         /// The childs of the bone. They will be relative to their parent.
@@ -99,6 +108,11 @@ namespace WGP.SFDynamicObject
         /// Outline thickness of the bone. Can only be changed using keys and animations.
         /// </summary>
         public float OutlineThickness { get; internal set; }
+
+        /// <summary>
+        /// Dynamic Object containing this resource.
+        /// </summary>
+        public SFDynamicObject Owner { get; internal set; }
 
         /// <summary>
         /// The temporary sprites are not saved but they are drawn at the same time as the bone. They

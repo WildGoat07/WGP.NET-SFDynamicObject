@@ -17,21 +17,14 @@ namespace WGP.SFDynamicObject
 
         #endregion Private Fields
 
-        #region Public Constructors
+        #region Internal Constructors
 
-        /// <summary>
-        /// Constructor.
-        /// </summary>
-        public Category()
+        internal Category()
         {
             Enabled = true;
             ID = Guid.NewGuid();
             Name = "";
         }
-
-        #endregion Public Constructors
-
-        #region Private Constructors
 
         internal Category(bool b)
         {
@@ -40,7 +33,7 @@ namespace WGP.SFDynamicObject
             Name = "Default";
         }
 
-        #endregion Private Constructors
+        #endregion Internal Constructors
 
         #region Public Properties
 
@@ -63,12 +56,21 @@ namespace WGP.SFDynamicObject
             set => _name = value ?? throw new NullReferenceException();
         }
 
-        public override int GetHashCode() => ID.GetHashCode();
+        /// <summary>
+        /// Dynamic Object containing this resource.
+        /// </summary>
+        public SFDynamicObject Owner { get; internal set; }
+
+        #endregion Public Properties
+
+        #region Public Methods
 
         public override bool Equals(object obj) => Equals((Category)obj);
 
         public bool Equals(Category other) => ID.Equals(other.ID);
 
-        #endregion Public Properties
+        public override int GetHashCode() => ID.GetHashCode();
+
+        #endregion Public Methods
     }
 }

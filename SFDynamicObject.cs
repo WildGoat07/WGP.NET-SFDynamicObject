@@ -45,19 +45,28 @@ namespace WGP.SFDynamicObject
         /// </summary>
         public static readonly Version CurrentVersion = new Version(2, 0, 0, 2);
 
-        #endregion Public Fields
-
-        #region Private Fields
-
         /// <summary>
         /// The default category of the object.
         /// </summary>
         public readonly Category DefaultCategory;
 
-        /// <summary>
-        /// Custom categories, to add more control over the object.
-        /// </summary>
-        public List<Category> CustomCategories { get; set; }
+        #endregion Public Fields
+
+        #region Internal Fields
+
+        internal List<Animation> _animations;
+
+        internal List<Bone> _bonesHierarchy;
+
+        internal List<Category> _customCategories;
+
+        internal List<Bone> _masterBones;
+
+        internal List<Resource> _usedResources;
+
+        #endregion Internal Fields
+
+        #region Private Fields
 
         private Queue<Animation> buffer;
 
@@ -83,35 +92,18 @@ namespace WGP.SFDynamicObject
         public SFDynamicObject()
         {
             DefaultCategory = new Category(true);
+            DefaultCategory.Owner = this;
             Version = CurrentVersion;
             oldAnimState = null;
             TransitionTime = Time.Zero;
             buffer = new Queue<Animation>();
-            BonesHierarchy = new ObservableCollection<Bone>();
-            BonesHierarchy.CollectionChanged += (sender, e) =>
-            {
-                if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add)
-                {
-                    foreach (Bone bone in e.NewItems)
-                    {
-                        bone.Owner = this;
-                        if (bone.Category == null)
-                            bone.Category = DefaultCategory;
-                    }
-                }
-                if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Replace || e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Remove)
-                {
-                    foreach (Bone bone in e.OldItems)
-                        bone.Owner = null;
-                }
-            };
-            MasterBones = new List<Bone>();
-            Animations = new List<Animation>();
-            UsedResources = new List<Resource>();
+            _bonesHierarchy = new List<Bone>();
+            _masterBones = new List<Bone>();
+            _animations = new List<Animation>();
+            _usedResources = new List<Resource>();
             currentAnim = null;
             mainChrono = null;
-            CustomCategories = new List<Category>();
-            Triggers = new List<EventTrigger>();
+            _customCategories = new List<Category>();
             ResetAnimation();
         }
 
@@ -122,13 +114,13 @@ namespace WGP.SFDynamicObject
         /// <summary>
         /// Animations available for the bones.
         /// </summary>
-        public List<Animation> Animations { get; set; }
+        public ReadOnlyCollection<Animation> Animations => _animations.AsReadOnly();
 
         /// <summary>
         /// The hierarchy of the bones. All bones must be here. The order in the hierarchy will be
         /// the order of drawing the sprites from the bones.
         /// </summary>
-        public ObservableCollection<Bone> BonesHierarchy { get; private set; }
+        public ReadOnlyCollection<Bone> BonesHierarchy => _bonesHierarchy.AsReadOnly();
 
         /// <summary>
         /// Chronometer of the animation. Need to be set to animate. Create a relative chronometer
@@ -156,9 +148,14 @@ namespace WGP.SFDynamicObject
         }
 
         /// <summary>
+        /// Custom categories, to add more control over the object.
+        /// </summary>
+        public ReadOnlyCollection<Category> CustomCategories => _customCategories.AsReadOnly();
+
+        /// <summary>
         /// The list of the master bones. All child bones must NOT be referenced here.
         /// </summary>
-        public List<Bone> MasterBones { get; set; }
+        public ReadOnlyCollection<Bone> MasterBones => _masterBones.AsReadOnly();
 
         /// <summary>
         /// Time between animations to smooth the transition.
@@ -166,15 +163,10 @@ namespace WGP.SFDynamicObject
         public Time TransitionTime { get; set; }
 
         /// <summary>
-        /// Event triggers of the object.
-        /// </summary>
-        public List<EventTrigger> Triggers { get; set; }
-
-        /// <summary>
         /// Resources used by this object. Should contains ALL resources used. Unused ones can be
         /// added too, tho.
         /// </summary>
-        public List<Resource> UsedResources { get; set; }
+        public ReadOnlyCollection<Resource> UsedResources => _usedResources.AsReadOnly();
 
         /// <summary>
         /// Version of the created object.
@@ -186,23 +178,79 @@ namespace WGP.SFDynamicObject
         #region Public Methods
 
         /// <summary>
+        /// Adds a resource to this object.
+        /// </summary>
+        /// <param name="res">Resource to add.</param>
+        /// <returns>True if successful, false if the resource already exists.</returns>
+        public bool AddResource(Resource res)
+        {
+            if (!_usedResources.Contains(res))
+            {
+                _usedResources.Add(res);
+                return true;
+            }
+            else
+                return false;
+        }
+
+        /// <summary>
         /// Cleans the resources by removing all the unused ones.
         /// </summary>
         public void CleanResources()
         {
             var newList = new List<Resource>();
-            foreach (var item in BonesHierarchy)
+            foreach (var item in _bonesHierarchy)
             {
                 if (item.AttachedSprite != null && item.AttachedSprite.Resource != null && !newList.Contains(item.AttachedSprite.Resource, new ResComparer()))
                     newList.Add(item.AttachedSprite.Resource);
             }
-            UsedResources = newList;
+            _usedResources = newList;
+        }
+
+        /// <summary>
+        /// Creates a new animation for this object.
+        /// </summary>
+        /// <returns>New animation.</returns>
+        public Animation CreateAnimation()
+        {
+            Animation result = new Animation();
+            result.Owner = this;
+            _animations.Add(result);
+            return result;
+        }
+
+        /// <summary>
+        /// Creates a new bone for this object.
+        /// </summary>
+        /// <param name="master">True if the bone is a masterbone.</param>
+        /// <returns>New bone.</returns>
+        public Bone CreateBone(bool master = false)
+        {
+            Bone result = new Bone();
+            result.Owner = this;
+            result.Category = DefaultCategory;
+            _bonesHierarchy.Add(result);
+            if (master)
+                _masterBones.Add(result);
+            return result;
+        }
+
+        /// <summary>
+        /// Creates a new category for this object.
+        /// </summary>
+        /// <returns>New category.</returns>
+        public Category CreateCustomCategory()
+        {
+            Category result = new Category();
+            result.Owner = this;
+            _customCategories.Add(result);
+            return result;
         }
 
         public void Draw(RenderTarget target, RenderStates states)
         {
             states.Transform *= Transform;
-            foreach (var bone in BonesHierarchy)
+            foreach (var bone in _bonesHierarchy)
             {
                 if (bone.DrawTempSpritesFirst && bone.TemporarySprites != null)
                 {
@@ -263,7 +311,7 @@ namespace WGP.SFDynamicObject
         public FloatRect GetLocalBounds()
         {
             FloatRect result = new FloatRect();
-            foreach (var bone in BonesHierarchy)
+            foreach (var bone in _bonesHierarchy)
             {
                 var tr = bone.ComputedTransform;
                 if (bone.AttachedSprite != null)
@@ -292,7 +340,7 @@ namespace WGP.SFDynamicObject
         /// <param name="queue">
         /// Queue containing the following animations to play once the current is finished.
         /// </param>
-        public void LoadAnimation(string anim, bool reset = true, params string[] queue) => LoadAnimation(Animations.Find((a) => a.Name == anim), reset, queue.Select((n) => Animations.Find((a) => a.Name == n)).ToArray());
+        public void LoadAnimation(string anim, bool reset = true, params string[] queue) => LoadAnimation(_animations.Find((a) => a.Name == anim), reset, queue.Select((n) => _animations.Find((a) => a.Name == n)).ToArray());
 
         /// <summary>
         /// Loads an animation. If a chronometer is set, it will reset.
@@ -302,7 +350,7 @@ namespace WGP.SFDynamicObject
         /// <param name="queue">
         /// Queue containing the following animations to play once the current is finished.
         /// </param>
-        public void LoadAnimation(Guid anim, bool reset = true, params Guid[] queue) => LoadAnimation(Animations.Find((a) => a.ID == anim), reset, queue.Select((id) => Animations.Find((a) => a.ID == id)).ToArray());
+        public void LoadAnimation(Guid anim, bool reset = true, params Guid[] queue) => LoadAnimation(_animations.Find((a) => a.ID == anim), reset, queue.Select((id) => _animations.Find((a) => a.ID == id)).ToArray());
 
         /// <summary>
         /// Loads an animation. If a chronometer is set, it will reset.
@@ -316,7 +364,7 @@ namespace WGP.SFDynamicObject
         {
             if (currentAnim != null)
                 oldAnimState = new Dictionary<Bone, Transformable>(transforms);
-            if (Animations == null)
+            if (_animations == null)
                 throw new Exception("No animations provided");
             if (queue != null)
                 buffer = new Queue<Animation>(queue);
@@ -326,9 +374,9 @@ namespace WGP.SFDynamicObject
                 currentAnim = null;
             else
             {
-                if (anim.Triggers != null)
+                if (anim._triggers != null)
                 {
-                    foreach (var item in anim.Triggers)
+                    foreach (var item in anim._triggers)
                     {
                         item.triggered = false;
                     }
@@ -345,7 +393,7 @@ namespace WGP.SFDynamicObject
                         }
                     }
                 }
-                foreach (var bone in BonesHierarchy)
+                foreach (var bone in _bonesHierarchy)
                     transforms.Add(bone, new Transformable());
                 if (Chronometer != null && reset)
                 {
@@ -358,12 +406,127 @@ namespace WGP.SFDynamicObject
         }
 
         /// <summary>
+        /// Moves the bone in the hierarchy.
+        /// </summary>
+        /// <param name="bone">Bone to move.</param>
+        /// <param name="beforeThisBone">
+        /// The bone will be moved just before this one. If set to null, the bone will be moved to
+        /// the end.
+        /// </param>
+        /// <returns>True if successful.</returns>
+        public bool MoveBone(Bone bone, Bone beforeThisBone)
+        {
+            if (bone.Owner == this && beforeThisBone == null)
+            {
+                _bonesHierarchy.Remove(bone);
+                _bonesHierarchy.Insert(_bonesHierarchy.Count, bone);
+                return true;
+            }
+            if (bone.Owner == this && beforeThisBone.Owner == this)
+            {
+                _bonesHierarchy.Remove(bone);
+                _bonesHierarchy.Insert(_bonesHierarchy.IndexOf(beforeThisBone), bone);
+                return true;
+            }
+            else
+                return false;
+        }
+
+        /// <summary>
+        /// Removes an animation.
+        /// </summary>
+        /// <param name="anim">Animation to remove.</param>
+        /// <returns>True if successful.</returns>
+        public bool RemoveAnimation(Animation anim)
+        {
+            if (anim == null)
+                return false;
+            if (anim.Owner == this)
+            {
+                anim.Owner = null;
+                _animations.Remove(anim);
+                return true;
+            }
+            else
+                return false;
+        }
+
+        /// <summary>
+        /// Removes a bone.
+        /// </summary>
+        /// <param name="bone">Bone to remove.</param>
+        /// <returns>True if successful.</returns>
+        public bool RemoveBone(Bone bone)
+        {
+            if (bone == null)
+                return false;
+            if (bone.Owner == this)
+            {
+                bone.Owner = null;
+                _masterBones.Remove(bone);
+                return _bonesHierarchy.Remove(bone);
+            }
+            else
+                return false;
+        }
+
+        /// <summary>
+        /// Removes a category.
+        /// </summary>
+        /// <param name="category">Category to remove.</param>
+        /// <returns>True if successful.</returns>
+        public bool RemoveCustomCategory(Category category)
+        {
+            if (category == null)
+                return false;
+            if (category.Owner == this)
+            {
+                category.Owner = null;
+                _customCategories.Remove(category);
+                return true;
+            }
+            else
+                return false;
+        }
+
+        /// <summary>
+        /// Removes a bone from the masterbone list.
+        /// </summary>
+        /// <param name="bone">Bone to remove.</param>
+        /// <returns>True if successful.</returns>
+        public bool RemoveMasterBone(Bone bone)
+        {
+            if (bone == null)
+                return false;
+            if (bone.Owner == this)
+                return _masterBones.Remove(bone);
+            return false;
+        }
+
+        /// <summary>
+        /// Removes a resource.
+        /// </summary>
+        /// <param name="res">Resource to remove.</param>
+        /// <returns>True if successful.</returns>
+        public bool RemoveResource(Resource res)
+        {
+            if (res == null)
+                return false;
+            foreach (var b in _bonesHierarchy)
+            {
+                if (b.AttachedSprite != null && b.AttachedSprite.Resource != null && b.AttachedSprite.Resource.ID == res.ID)
+                    b.AttachedSprite.Resource = null;
+            }
+            return _usedResources.Remove(res);
+        }
+
+        /// <summary>
         /// Resets the positon of the object, making it in the default position
         /// </summary>
         public void ResetAnimation()
         {
             transforms = new Dictionary<Bone, Transformable>();
-            foreach (var item in BonesHierarchy)
+            foreach (var item in _bonesHierarchy)
             {
                 item.Color = Color.White;
                 item.OutlineColor = Color.White;
@@ -388,7 +551,7 @@ namespace WGP.SFDynamicObject
             {
                 FormatData result = new FormatData();
                 result.Version = CurrentVersion.ToString();
-                result.Hierarchy = BonesHierarchy.Select((bone) =>
+                result.Hierarchy = _bonesHierarchy.Select((bone) =>
                 {
                     var tmp = new BoneData();
                     tmp.BlendMode = bone.BlendMode;
@@ -419,8 +582,8 @@ namespace WGP.SFDynamicObject
 
                     return tmp;
                 }).ToArray();
-                result.Masters = MasterBones.Select((bone) => bone.ID.ToByteArray()).ToArray();
-                result.Categories = CustomCategories.Select((categ) =>
+                result.Masters = _masterBones.Select((bone) => bone.ID.ToByteArray()).ToArray();
+                result.Categories = _customCategories.Select((categ) =>
                 {
                     var tmp = new CategoryData();
                     tmp.Name = categ.Name;
@@ -428,7 +591,7 @@ namespace WGP.SFDynamicObject
 
                     return tmp;
                 }).ToArray();
-                result.Animations = Animations.Select((anim) =>
+                result.Animations = _animations.Select((anim) =>
                 {
                     var tmp = new AnimationData();
                     tmp.ID = anim.ID.ToByteArray();
@@ -472,7 +635,7 @@ namespace WGP.SFDynamicObject
 
                         return tmp2;
                     }).ToArray();
-                    tmp.Triggers = anim.Triggers.Select((t) =>
+                    tmp.Triggers = anim._triggers.Select((t) =>
                     {
                         var tmp2 = new Trigger();
                         tmp2.Area = t.Area;
@@ -486,7 +649,7 @@ namespace WGP.SFDynamicObject
 
                     return tmp;
                 }).ToArray();
-                result.Resources = UsedResources.ToArray();
+                result.Resources = _usedResources.ToArray();
                 var formatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
                 formatter.Serialize(stream, result);
             }
@@ -497,6 +660,24 @@ namespace WGP.SFDynamicObject
         }
 
         /// <summary>
+        /// Sets a bone as masterbone.
+        /// </summary>
+        /// <param name="bone">Bone to change.</param>
+        /// <returns>True if successful.</returns>
+        public bool SetMasterBone(Bone bone)
+        {
+            if (bone.Owner == this)
+            {
+                if (!_masterBones.Contains(bone))
+                {
+                    _masterBones.Add(bone);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Updates the display of the object by adjusting the bones to match the animations. Won't
         /// have any effect if there are no chronometer set or no animation loaded.
         /// </summary>
@@ -504,7 +685,7 @@ namespace WGP.SFDynamicObject
         {
             if (mainChrono != null)
             {
-                foreach (var bone in BonesHierarchy)
+                foreach (var bone in _bonesHierarchy)
                 {
                     if (bone.SpriteChrono == null)
                         bone.SpriteChrono = new Chronometer(mainChrono);
@@ -521,9 +702,9 @@ namespace WGP.SFDynamicObject
                     else
                     {
                         Chronometer.Restart();
-                        if (currentAnim.Triggers != null)
+                        if (currentAnim._triggers != null)
                         {
-                            foreach (var item in currentAnim.Triggers)
+                            foreach (var item in currentAnim._triggers)
                             {
                                 item.triggered = false;
                             }
@@ -532,9 +713,9 @@ namespace WGP.SFDynamicObject
                 }
                 Time currentTime = Chronometer.ElapsedTime;
                 Time currentFadeTime = fadeChrono.ElapsedTime;
-                if (currentAnim.Triggers != null)
+                if (currentAnim._triggers != null)
                 {
-                    foreach (var item in currentAnim.Triggers)
+                    foreach (var item in currentAnim._triggers)
                     {
                         if (!item.triggered)
                         {
@@ -547,7 +728,7 @@ namespace WGP.SFDynamicObject
                         }
                     }
                 }
-                foreach (var bone in BonesHierarchy)
+                foreach (var bone in _bonesHierarchy)
                 {
                     bone.Opacity = 255;
                     bone.Color = Color.White;
@@ -694,20 +875,20 @@ namespace WGP.SFDynamicObject
                     else
                         transforms[bone] = new Transformable();
                 }
-                foreach (var bone in MasterBones)
+                foreach (var bone in _masterBones)
                 {
                     ComputeBone(bone, null);
                 }
             }
             else
             {
-                foreach (var bone in BonesHierarchy)
+                foreach (var bone in _bonesHierarchy)
                 {
                     bone.Opacity = 255;
                     transforms[bone] = new Transformable();
                     continue;
                 }
-                foreach (var bone in MasterBones)
+                foreach (var bone in _masterBones)
                 {
                     ComputeBone(bone, null);
                 }

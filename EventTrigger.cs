@@ -17,12 +17,9 @@ namespace WGP.SFDynamicObject
 
         #endregion Internal Fields
 
-        #region Public Constructors
+        #region Internal Constructors
 
-        /// <summary>
-        /// Constructor.
-        /// </summary>
-        public EventTrigger()
+        internal EventTrigger()
         {
             ID = Guid.NewGuid();
             Name = null;
@@ -31,9 +28,14 @@ namespace WGP.SFDynamicObject
             Time = default;
         }
 
-        #endregion Public Constructors
+        #endregion Internal Constructors
 
         #region Public Properties
+
+        /// <summary>
+        /// Animation containing this resource.
+        /// </summary>
+        public Animation Animation { get; internal set; }
 
         /// <summary>
         /// Area triggered by the event.
@@ -49,6 +51,11 @@ namespace WGP.SFDynamicObject
         /// Name describing the event.
         /// </summary>
         public string Name { get; set; }
+
+        /// <summary>
+        /// Dynamic Object containing this resource.
+        /// </summary>
+        public SFDynamicObject Owner { get; internal set; }
 
         /// <summary>
         /// Time at which is triggered the event.
