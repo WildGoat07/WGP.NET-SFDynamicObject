@@ -154,7 +154,7 @@ namespace WGP.SFDynamicObject
                     }));
                     if (anim.Triggers != null)
                     {
-                        anim.Triggers.Select((t) =>
+                        tmp1._triggers.AddRange(anim.Triggers.Select((t) =>
                         {
                             var tmp2 = tmp1.CreateEvent();
                             tmp2.Area = t.Area;
@@ -163,11 +163,10 @@ namespace WGP.SFDynamicObject
                             tmp2.Time = t.Time;
 
                             return tmp2;
-                        });
+                        }));
                     }
                     tmp1.Duration = Time.FromMicroseconds(anim.Duration);
                 });
-
                 return result;
             }
             catch (Exception e)
