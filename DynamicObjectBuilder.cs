@@ -64,6 +64,10 @@ namespace WGP.SFDynamicObject
             {
                 var result = new SFDynamicObject();
                 result.Version = new Version(copyFrom.Version);
+                foreach (var item in copyFrom.Resources)
+                {
+                    result.AddResource(item);
+                }
                 copyFrom.Categories.ForEach((categ) =>
                 {
                     var tmp = result.CreateCustomCategory();
