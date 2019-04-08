@@ -106,6 +106,12 @@ namespace WGP.SFDynamicObject
         /// </summary>
         public class Key : IComparable<Key>, IComparable
         {
+            #region Internal Fields
+
+            internal bool reached;
+
+            #endregion Internal Fields
+
             #region Public Constructors
 
             /// <summary>
@@ -134,6 +140,8 @@ namespace WGP.SFDynamicObject
                 OutlineThicknessFunction = Fct.LINEAR;
                 OutlineThicknessFctCoeff = 1;
                 Opacity = 255;
+                TextureTime = null;
+                reached = false;
             }
 
             #endregion Public Constructors
@@ -260,6 +268,11 @@ namespace WGP.SFDynamicObject
             /// How the scale will be calculated.
             /// </summary>
             public Fct ScaleFunction { get; set; }
+
+            /// <summary>
+            /// The key will update the timer of the dynamic texture. null if this parameter is not used.
+            /// </summary>
+            public Time? TextureTime { get; set; }
 
             /// <summary>
             /// The transformations to add (or multiply in the case of scaling) to the bone.

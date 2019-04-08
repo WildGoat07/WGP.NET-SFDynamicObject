@@ -147,6 +147,7 @@ namespace WGP.SFDynamicObject
                             tmp3.ColorFctCoeff = key.ColCoeff;
                             tmp3.OutlineThicknessFunction = key.OThFunction;
                             tmp3.OutlineThicknessFctCoeff = key.OThCoeff;
+                            tmp3.TextureTime = key.TextureTime;
 
                             return tmp3;
                         }));

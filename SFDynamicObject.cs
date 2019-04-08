@@ -79,7 +79,6 @@ namespace WGP.SFDynamicObject
         private Chronometer mainChrono;
 
         private Dictionary<Bone, Transformable> oldAnimState;
-
         private Dictionary<Bone, Transformable> transforms;
 
         #endregion Private Fields
@@ -629,6 +628,7 @@ namespace WGP.SFDynamicObject
                             tmp3.ColCoeff = key.ColorFctCoeff;
                             tmp3.OThFunction = key.OutlineThicknessFunction;
                             tmp3.OThCoeff = key.OutlineThicknessFctCoeff;
+                            tmp3.TextureTime = key.TextureTime;
 
                             return tmp3;
                         }).ToArray();
@@ -689,8 +689,6 @@ namespace WGP.SFDynamicObject
                 {
                     if (bone.SpriteChrono == null)
                         bone.SpriteChrono = new Chronometer(mainChrono);
-                    if (bone.AttachedSprite != null)
-                        bone.AttachedSprite.Update(bone.SpriteChrono.ElapsedTime);
                 }
             }
             if (currentAnim != null && Chronometer != null)
@@ -702,6 +700,13 @@ namespace WGP.SFDynamicObject
                     else
                     {
                         Chronometer.Restart();
+                        foreach (var b in currentAnim.Bones)
+                        {
+                            foreach (var k in b.Value)
+                            {
+                                k.reached = false;
+                            }
+                        }
                         if (currentAnim._triggers != null)
                         {
                             foreach (var item in currentAnim._triggers)
@@ -870,6 +875,14 @@ namespace WGP.SFDynamicObject
                                 tr.Origin = Utilities.Interpolation(perc2, oldAnimState[bone].Origin, tr.Origin);
                             }
                             transforms[bone] = tr;
+                            if (!first.reached)
+                            {
+                                if (first.TextureTime.HasValue)
+                                    bone.SpriteChrono.ElapsedTime = first.TextureTime.Value;
+                            }
+                            first.reached = true;
+                            if (bone.AttachedSprite != null)
+                                bone.AttachedSprite.Update(bone.SpriteChrono.ElapsedTime);
                         }
                     }
                     else

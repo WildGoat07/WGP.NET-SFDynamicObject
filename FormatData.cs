@@ -244,6 +244,7 @@ namespace WGP.SFDynamicObject
         public Animation.Key.Fct RotFunction;
         public float ScaCoeff;
         public Animation.Key.Fct ScaFunction;
+        public Time? TextureTime;
         public TransformData Transform;
 
         #endregion Public Fields
