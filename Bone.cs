@@ -41,8 +41,7 @@ namespace WGP.SFDynamicObject
         #region Public Properties
 
         /// <summary>
-        /// The list of sprites affected by the changes of the bone. Be careful of the order (the
-        /// order of drawing). The string is the name of the texture in the texture manager.
+        /// The list of sprites affected by the changes of the bone.
         /// </summary>
         public DynamicSprite AttachedSprite { get; set; }
 
